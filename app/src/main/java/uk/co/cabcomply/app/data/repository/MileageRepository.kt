@@ -109,4 +109,32 @@ class MileageRepository @Inject constructor(
 
         return entry
     }
+
+    /**
+     * The odometer reading a driver enters during a Daily Check is a real mileage reading and
+     * must show up in Mileage records too, not just live on the inspection. Creates an open
+     * (no end mileage yet) entry starting at that reading, but only if there isn't already a
+     * mileage entry for this vehicle today — never duplicates one the driver already logged
+     * manually.
+     */
+    suspend fun ensureDailyCheckStartEntry(vehicleId: String, odometer: Int, dayStart: Long, timestamp: Long) {
+        val dayEnd = dayStart + 86_400_000L - 1
+        if (dao.countForVehicleInDay(vehicleId, dayStart, dayEnd) > 0) return
+        dao.upsert(
+            MileageEntryEntity(
+                id = Ids.newId(),
+                vehicleId = vehicleId,
+                startMileage = odometer,
+                endMileage = null,
+                entryDate = dayStart,
+                startedAt = timestamp,
+                endedAt = null,
+                purpose = MileagePurpose.BUSINESS,
+                notes = "Recorded from Daily Vehicle Check",
+                isFlagged = false,
+                flagReason = null,
+                createdAt = timestamp
+            )
+        )
+    }
 }

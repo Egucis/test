@@ -19,6 +19,7 @@ import uk.co.cabcomply.app.data.repository.ChecklistRepository
 import uk.co.cabcomply.app.data.repository.DefectRepository
 import uk.co.cabcomply.app.data.repository.DriverRepository
 import uk.co.cabcomply.app.data.repository.InspectionRepository
+import uk.co.cabcomply.app.data.repository.MileageRepository
 import uk.co.cabcomply.app.data.repository.VehicleRepository
 import uk.co.cabcomply.app.util.AppClock
 import uk.co.cabcomply.app.util.Ids
@@ -72,6 +73,7 @@ class DailyCheckViewModel @Inject constructor(
     private val defectRepository: DefectRepository,
     private val driverRepository: DriverRepository,
     private val authorityRepository: AuthorityRepository,
+    private val mileageRepository: MileageRepository,
     private val photoStorage: PhotoStorage,
     private val clock: AppClock
 ) : ViewModel() {
@@ -270,6 +272,7 @@ class DailyCheckViewModel @Inject constructor(
                 )
             }
             inspectionRepository.completeInspection(inspection, outcomes)
+            mileageRepository.ensureDailyCheckStartEntry(vehicle.id, odometer, inspection.inspectionDate, now)
             _state.value = _state.value.copy(isSaving = false, completedInspectionId = inspection.id)
         }
     }

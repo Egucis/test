@@ -7,6 +7,7 @@ import android.graphics.pdf.PdfDocument
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
+import android.text.TextUtils
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import uk.co.cabcomply.app.R
@@ -17,7 +18,7 @@ import javax.inject.Singleton
 
 private const val PAGE_WIDTH = 595 // A4 at 72dpi
 private const val PAGE_HEIGHT = 842
-private const val MARGIN = 40f
+private const val MARGIN = 28f
 private const val CONTENT_WIDTH = PAGE_WIDTH - 2 * MARGIN
 
 private const val COLOR_BRAND = 0xFF0B4F6C.toInt()
@@ -25,28 +26,33 @@ private const val COLOR_INK = 0xFF16232B.toInt()
 private const val COLOR_MUTED = 0xFF5B6B73.toInt()
 private const val COLOR_DEFECT = 0xFFB3261E.toInt()
 private const val COLOR_OK = 0xFF1E8E5A.toInt()
-private const val COLOR_RULE = 0xFFDDE3E6.toInt()
+private const val COLOR_RULE = 0xFFB9C2C6.toInt()
 
 /**
- * Renders a [WeeklyReportData] as a print-friendly, multi-page A4 PDF with consistent CabComply
- * branding (product spec sections 38-40, 75). Pagination is handled by tracking a running
- * vertical cursor and starting a fresh page whenever the next block would not fit.
+ * Renders a [WeeklyReportData] as a print-friendly, multi-page A4 PDF: an item-by-item matrix
+ * (every checklist item as a row, every day as a column) with CabComply branding, matching the
+ * format a licensing officer expects to see on paper (product spec sections 38-40, 75).
+ * Pagination re-draws the day-header row at the top of every continuation page.
  */
 @Singleton
 class WeeklyReportPdfGenerator @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
+    private val itemColWidth = 180f
+    private val dayColWidth = (CONTENT_WIDTH - itemColWidth) / 7f
+    private val matrixHeaderHeight = 42f
+    private val matrixRowHeight = 13.5f
+
     fun generate(report: WeeklyReportData): File {
         val document = PdfDocument()
         val cursor = PageCursor(document)
         cursor.startPage()
 
         drawHeader(cursor, report)
-        drawMetaBlock(cursor, report)
-        drawDailyTable(cursor, report)
-        drawMileageSummary(cursor, report)
-        drawDefects(cursor, report)
-        drawFooterNote(cursor)
+        drawMetaGrid(cursor, report)
+        drawMatrix(cursor, report)
+        drawFooterSections(cursor, report)
+        drawLegend(cursor, report)
 
         cursor.finishPage()
 
@@ -59,170 +65,172 @@ class WeeklyReportPdfGenerator @Inject constructor(
 
     private fun drawHeader(cursor: PageCursor, report: WeeklyReportData) {
         val canvas = cursor.canvas
-        val logoSize = 48f
+        val logoSize = 34f
         val drawable = ContextCompat.getDrawable(context, R.drawable.ic_cabcomply_logo)
-        drawable?.setBounds(
-            MARGIN.toInt(),
-            cursor.y.toInt(),
-            (MARGIN + logoSize).toInt(),
-            (cursor.y + logoSize).toInt()
-        )
+        drawable?.setBounds(MARGIN.toInt(), cursor.y.toInt(), (MARGIN + logoSize).toInt(), (cursor.y + logoSize).toInt())
         drawable?.draw(canvas)
 
-        val titlePaint = textPaint(20f, COLOR_INK, bold = true)
-        canvas.drawText("CabComply", MARGIN + logoSize + 14f, cursor.y + 22f, titlePaint)
-        val subPaint = textPaint(11f, COLOR_MUTED)
-        canvas.drawText("Vehicle Daily Check Record — Weekly Report", MARGIN + logoSize + 14f, cursor.y + 40f, subPaint)
+        canvas.drawText("CabComply", MARGIN + logoSize + 10f, cursor.y + 15f, textPaint(13f, COLOR_INK, bold = true))
+        canvas.drawText("Digital compliance record", MARGIN + logoSize + 10f, cursor.y + 28f, textPaint(8f, COLOR_MUTED))
 
-        cursor.y += logoSize + 16f
+        val titlePaint = textPaint(15f, COLOR_INK, bold = true).apply { textAlign = Paint.Align.RIGHT }
+        canvas.drawText("Daily Vehicle Check List & Defect Report", PAGE_WIDTH - MARGIN, cursor.y + 20f, titlePaint)
+
+        cursor.y += logoSize + 12f
         drawRule(cursor)
-        cursor.y += 14f
+        cursor.y += 12f
     }
 
-    private fun drawMetaBlock(cursor: PageCursor, report: WeeklyReportData) {
-        val labelPaint = textPaint(10f, COLOR_MUTED)
-        val valuePaint = textPaint(12f, COLOR_INK, bold = true)
+    private fun drawMetaGrid(cursor: PageCursor, report: WeeklyReportData) {
+        val rowHeight = 30f
+        val colWidth = CONTENT_WIDTH / 2
+        cursor.ensureSpace(rowHeight * 2)
+        val top = cursor.y
 
-        val leftX = MARGIN
-        val rightX = MARGIN + CONTENT_WIDTH / 2
-
-        fun row(x: Float, y: Float, label: String, value: String) {
-            cursor.canvas.drawText(label, x, y, labelPaint)
-            cursor.canvas.drawText(value, x, y + 15f, valuePaint)
+        fun cell(col: Int, row: Int, label: String, value: String) {
+            val x = MARGIN + col * colWidth
+            val y = top + row * rowHeight
+            cursor.canvas.drawRect(x, y, x + colWidth, y + rowHeight, gridStrokePaint())
+            cursor.canvas.drawText(label, x + 8f, y + 12f, textPaint(8f, COLOR_MUTED, bold = true))
+            cursor.canvas.drawText(value, x + 8f, y + 24f, textPaint(10.5f, COLOR_INK, bold = true))
         }
 
-        row(leftX, cursor.y, "Vehicle", "${report.vehicleRegistration} · ${report.vehicleMakeModel}")
-        row(rightX, cursor.y, "Driver", report.driverName)
-        cursor.y += 34f
-        row(leftX, cursor.y, "Licensing authority", report.licensingAuthorityName ?: "Not set")
-        row(rightX, cursor.y, "Week", "${report.weekStartLabel} – ${report.weekEndLabel}")
-        cursor.y += 34f
+        cell(0, 0, "Vehicle Registration No", report.vehicleRegistration)
+        cell(1, 0, "Vehicle Make / Model", report.vehicleMakeModel)
+        cell(0, 1, "Driver's Name", report.driverName)
+        cell(1, 1, "Week starting", report.weekStartLabel)
 
-        drawRule(cursor)
-        cursor.y += 16f
+        cursor.y = top + rowHeight * 2 + 12f
     }
 
-    private fun drawDailyTable(cursor: PageCursor, report: WeeklyReportData) {
-        cursor.ensureSpace(24f)
-        cursor.canvas.drawText("Daily checks", MARGIN, cursor.y, textPaint(13f, COLOR_INK, bold = true))
-        cursor.y += 18f
+    private fun drawMatrixHeaderRow(cursor: PageCursor, report: WeeklyReportData) {
+        cursor.ensureSpace(matrixHeaderHeight)
+        val top = cursor.y
+        var x = MARGIN
+        cursor.canvas.drawRect(x, top, x + itemColWidth, top + matrixHeaderHeight, gridStrokePaint())
+        x += itemColWidth
+        report.dayHeaders.forEach { day ->
+            cursor.canvas.drawRect(x, top, x + dayColWidth, top + matrixHeaderHeight, gridStrokePaint())
+            val centerX = x + dayColWidth / 2
+            drawCentered(cursor.canvas, day.dayLetter, centerX, top + 12f, textPaint(9f, COLOR_INK, bold = true))
+            drawCentered(cursor.canvas, day.dateLabel, centerX, top + 22f, textPaint(6.5f, COLOR_MUTED))
+            drawCentered(cursor.canvas, day.timeLabel ?: "", centerX, top + 31f, textPaint(6.5f, COLOR_MUTED))
+            drawCentered(cursor.canvas, day.odometerLabel ?: "", centerX, top + 40f, textPaint(6.5f, COLOR_MUTED))
+            x += dayColWidth
+        }
+        cursor.y = top + matrixHeaderHeight
+    }
 
-        val colDay = MARGIN
-        val colStatus = MARGIN + 110f
-        val colTime = MARGIN + 250f
-        val colOdo = MARGIN + 330f
-        val colDefect = MARGIN + 430f
+    private fun drawMatrix(cursor: PageCursor, report: WeeklyReportData) {
+        drawMatrixHeaderRow(cursor, report)
 
-        val headerPaint = textPaint(9.5f, COLOR_MUTED, bold = true)
-        cursor.ensureSpace(20f)
-        cursor.canvas.drawText("DAY", colDay, cursor.y, headerPaint)
-        cursor.canvas.drawText("STATUS", colStatus, cursor.y, headerPaint)
-        cursor.canvas.drawText("TIME", colTime, cursor.y, headerPaint)
-        cursor.canvas.drawText("ODOMETER", colOdo, cursor.y, headerPaint)
-        cursor.canvas.drawText("DEFECT", colDefect, cursor.y, headerPaint)
-        cursor.y += 6f
-        drawRule(cursor)
-        cursor.y += 16f
-
-        val bodyPaint = textPaint(11f, COLOR_INK)
-        report.days.forEach { day ->
-            cursor.ensureSpace(20f)
-            cursor.canvas.drawText("${day.dayOfWeekLabel} ${day.dateLabel}", colDay, cursor.y, bodyPaint)
-
-            val statusText = if (day.completed) "Completed" else "Not completed"
-            val statusPaint = textPaint(11f, if (day.completed) COLOR_OK else COLOR_MUTED, bold = day.completed)
-            cursor.canvas.drawText(
-                statusText + if (day.isQuickCheck) " (Quick Check)" else "",
-                colStatus,
-                cursor.y,
-                statusPaint
-            )
-
-            cursor.canvas.drawText(day.completionTimeLabel ?: "—", colTime, cursor.y, bodyPaint)
-            cursor.canvas.drawText(day.odometer?.toString() ?: "—", colOdo, cursor.y, bodyPaint)
-            if (day.hasDefect) {
-                cursor.canvas.drawText("Yes", colDefect, cursor.y, textPaint(11f, COLOR_DEFECT, bold = true))
-            } else {
-                cursor.canvas.drawText("—", colDefect, cursor.y, bodyPaint)
+        val nameTextPaint = textPaint(7.5f, COLOR_INK)
+        report.itemRows.forEach { row ->
+            if (cursor.y + matrixRowHeight > PAGE_HEIGHT - MARGIN) {
+                cursor.finishPage()
+                cursor.startPage()
+                drawMatrixHeaderRow(cursor, report)
             }
-            cursor.y += 20f
+            val top = cursor.y
+            var x = MARGIN
+            cursor.canvas.drawRect(x, top, x + itemColWidth, top + matrixRowHeight, gridStrokePaint())
+            val label = ellipsize(row.itemName, nameTextPaint, itemColWidth - 8f)
+            cursor.canvas.drawText(label, x + 4f, top + matrixRowHeight - 3.5f, nameTextPaint)
+            x += itemColWidth
+
+            row.statuses.forEach { status ->
+                cursor.canvas.drawRect(x, top, x + dayColWidth, top + matrixRowHeight, gridStrokePaint())
+                val centerX = x + dayColWidth / 2
+                val baselineY = top + matrixRowHeight - 3.5f
+                when (status) {
+                    ItemDayStatus.OK -> drawCentered(cursor.canvas, "✓", centerX, baselineY, textPaint(9f, COLOR_OK, bold = true))
+                    ItemDayStatus.DEFECT -> drawCentered(cursor.canvas, "X", centerX, baselineY, textPaint(9f, COLOR_DEFECT, bold = true))
+                    ItemDayStatus.NOT_APPLICABLE -> drawCentered(cursor.canvas, "N/A", centerX, baselineY, textPaint(6.5f, COLOR_MUTED))
+                    ItemDayStatus.NOT_RECORDED -> Unit
+                }
+                x += dayColWidth
+            }
+            cursor.y = top + matrixRowHeight
         }
-        cursor.y += 6f
-        drawRule(cursor)
-        cursor.y += 16f
+        cursor.y += 10f
     }
 
-    private fun drawMileageSummary(cursor: PageCursor, report: WeeklyReportData) {
-        cursor.ensureSpace(40f)
-        cursor.canvas.drawText("Mileage this week", MARGIN, cursor.y, textPaint(13f, COLOR_INK, bold = true))
-        cursor.y += 18f
-        val bodyPaint = textPaint(11f, COLOR_INK)
-        cursor.canvas.drawText(
-            "Total: ${report.mileageTotalMiles} miles   •   Business: ${report.mileageBusinessMiles} miles",
-            MARGIN,
-            cursor.y,
-            bodyPaint
+    private fun drawFooterSections(cursor: PageCursor, report: WeeklyReportData) {
+        val boxHeight = 110f
+        cursor.ensureSpace(boxHeight)
+        val top = cursor.y
+        val colWidth = CONTENT_WIDTH / 3
+
+        cursor.canvas.drawRect(MARGIN, top, MARGIN + CONTENT_WIDTH, top + boxHeight, gridStrokePaint())
+        cursor.canvas.drawLine(MARGIN + colWidth, top, MARGIN + colWidth, top + boxHeight, gridStrokePaint())
+        cursor.canvas.drawLine(MARGIN + colWidth * 2, top, MARGIN + colWidth * 2, top + boxHeight, gridStrokePaint())
+
+        val openDefects = report.defects.filter { it.statusLabel == "Open" }
+        val resolvedDefects = report.defects.filter { it.statusLabel == "Resolved" }
+
+        drawWrappedColumn(
+            cursor.canvas, "Report defects here", MARGIN + 8f, top + 6f, colWidth - 16f,
+            if (openDefects.isEmpty() && report.defects.isEmpty()) "No defects recorded." else
+                openDefects.joinToString("\n") { "${it.dateLabel} · ${it.checklistItem}: ${it.description}" }
+                    .ifBlank { "No open defects — all recorded defects resolved." }
         )
-        cursor.y += 24f
-        drawRule(cursor)
-        cursor.y += 16f
+        drawWrappedColumn(
+            cursor.canvas, "Rectified", MARGIN + colWidth + 8f, top + 6f, colWidth - 16f,
+            if (resolvedDefects.isEmpty()) "No defects required rectification." else
+                resolvedDefects.joinToString("\n") { "${it.dateLabel} · ${it.checklistItem}${it.resolutionNote?.let { n -> ": $n" } ?: ""}" }
+        )
+        drawWrappedColumn(
+            cursor.canvas, "Driver's signature", MARGIN + colWidth * 2 + 8f, top + 6f, colWidth - 16f,
+            if (report.driverSignatures.isEmpty()) "No checks completed this week." else report.driverSignatures.joinToString("\n")
+        )
+
+        cursor.y = top + boxHeight + 14f
     }
 
-    private fun drawDefects(cursor: PageCursor, report: WeeklyReportData) {
+    private fun drawLegend(cursor: PageCursor, report: WeeklyReportData) {
         cursor.ensureSpace(24f)
         cursor.canvas.drawText(
-            if (report.defects.isEmpty()) "No defects recorded this week" else "Defects recorded this week",
-            MARGIN,
-            cursor.y,
-            textPaint(13f, COLOR_INK, bold = true)
+            "Legend: ✓ = OK   X = defect   N/A = not applicable   blank = no digital record for that day",
+            MARGIN, cursor.y, textPaint(7f, COLOR_MUTED)
         )
-        cursor.y += 18f
-
-        report.defects.forEach { defect ->
-            val headerPaint = textPaint(11f, COLOR_INK, bold = true)
-            val header = "${defect.dateLabel} · ${defect.checklistItem} · ${defect.statusLabel}"
-            val headerLayout = buildLayout(header, headerPaint, CONTENT_WIDTH)
-            val bodyLayout = buildLayout(defect.description, textPaint(11f, COLOR_MUTED), CONTENT_WIDTH)
-            val blockHeight = headerLayout.height + bodyLayout.height + 16f
-
-            cursor.ensureSpace(blockHeight)
-            cursor.canvas.save()
-            cursor.canvas.translate(MARGIN, cursor.y)
-            headerLayout.draw(cursor.canvas)
-            cursor.canvas.translate(0f, headerLayout.height.toFloat() + 2f)
-            bodyLayout.draw(cursor.canvas)
-            cursor.canvas.restore()
-            cursor.y += blockHeight
-        }
+        cursor.y += 12f
+        cursor.canvas.drawText("Generated ${report.generatedAtLabel}", MARGIN, cursor.y, textPaint(7f, COLOR_MUTED))
     }
 
-    private fun drawFooterNote(cursor: PageCursor) {
-        cursor.ensureSpace(40f)
-        val notePaint = textPaint(8.5f, COLOR_MUTED)
-        val layout = buildLayout(
-            "This record was created by the driver using CabComply and reflects the driver's own inspection. " +
-                "CabComply is an independent record-keeping tool and does not itself guarantee legal or licensing compliance.",
-            notePaint,
-            CONTENT_WIDTH
-        )
-        cursor.ensureSpace(layout.height.toFloat())
-        cursor.canvas.save()
-        cursor.canvas.translate(MARGIN, cursor.y)
-        layout.draw(cursor.canvas)
-        cursor.canvas.restore()
-        cursor.y += layout.height
+    private fun drawWrappedColumn(canvas: Canvas, title: String, x: Float, y: Float, width: Float, body: String) {
+        canvas.drawText(title, x, y + 8f, textPaint(8f, COLOR_INK, bold = true))
+        val layout = buildLayout(body, textPaint(7f, COLOR_MUTED), width)
+        canvas.save()
+        canvas.translate(x, y + 16f)
+        layout.draw(canvas)
+        canvas.restore()
     }
 
     private fun drawRule(cursor: PageCursor) {
-        val paint = Paint().apply { color = COLOR_RULE; strokeWidth = 1f }
-        cursor.canvas.drawLine(MARGIN, cursor.y, PAGE_WIDTH - MARGIN, cursor.y, paint)
+        cursor.canvas.drawLine(MARGIN, cursor.y, PAGE_WIDTH - MARGIN, cursor.y, gridStrokePaint())
     }
 
+    private fun drawCentered(canvas: Canvas, text: String, centerX: Float, baselineY: Float, paint: Paint) {
+        val align = paint.textAlign
+        paint.textAlign = Paint.Align.CENTER
+        canvas.drawText(text, centerX, baselineY, paint)
+        paint.textAlign = align
+    }
+
+    private fun ellipsize(text: String, paint: Paint, maxWidth: Float): String =
+        TextUtils.ellipsize(text, paint, maxWidth, TextUtils.TruncateAt.END).toString()
+
     private fun buildLayout(text: String, paint: TextPaint, width: Float): StaticLayout =
-        StaticLayout.Builder.obtain(text, 0, text.length, paint, width.toInt())
+        StaticLayout.Builder.obtain(text, 0, text.length, paint, width.toInt().coerceAtLeast(1))
             .setAlignment(Layout.Alignment.ALIGN_NORMAL)
             .setLineSpacing(0f, 1.15f)
             .build()
+
+    private fun gridStrokePaint(): Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = COLOR_RULE
+        style = Paint.Style.STROKE
+        strokeWidth = 0.75f
+    }
 
     private fun textPaint(size: Float, color: Int, bold: Boolean = false): TextPaint =
         TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -251,7 +259,6 @@ class WeeklyReportPdfGenerator @Inject constructor(
             currentPage?.let { document.finishPage(it) }
         }
 
-        /** Ensures at least [heightNeeded] points remain below [y]; otherwise starts a new page first. */
         fun ensureSpace(heightNeeded: Float) {
             if (y + heightNeeded > PAGE_HEIGHT - MARGIN) {
                 finishPage()

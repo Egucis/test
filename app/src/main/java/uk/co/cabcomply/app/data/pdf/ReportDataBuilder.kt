@@ -1,6 +1,9 @@
 package uk.co.cabcomply.app.data.pdf
 
 import uk.co.cabcomply.app.data.db.entity.DefectStatus
+import uk.co.cabcomply.app.data.db.entity.InspectionEntity
+import uk.co.cabcomply.app.data.db.entity.InspectionResultEntity
+import uk.co.cabcomply.app.data.db.entity.InspectionResultStatus
 import uk.co.cabcomply.app.data.db.entity.MileagePurpose
 import uk.co.cabcomply.app.data.repository.AuthorityRepository
 import uk.co.cabcomply.app.data.repository.DriverRepository
@@ -16,7 +19,8 @@ import javax.inject.Singleton
 /**
  * Builds a [WeeklyReportData] snapshot for one vehicle and one Monday-to-Sunday week. Used by
  * both the weekly PDF generator and the Officer Mode weekly view so the two always show the
- * same figures (product spec section 89).
+ * same figures (product spec section 89). Pivots each day's checklist results into one
+ * item-by-item matrix, the same shape a licensing officer expects to see on paper.
  */
 @Singleton
 class ReportDataBuilder @Inject constructor(
@@ -40,33 +44,70 @@ class ReportDataBuilder @Inject constructor(
         val inspections = inspectionRepository.getHistorySnapshot(vehicleId, fromMillis, toMillis)
         val mileageEntries = mileageRepository.getFilteredSnapshot(vehicleId, fromMillis, toMillis)
 
-        val days = (0..6).map { offset ->
+        // The inspection actually used for each of the 7 days (null if no check was completed).
+        val inspectionByDay: List<InspectionEntity?> = (0..6).map { offset ->
             val date = weekStart.plusDays(offset.toLong())
             val dayStartMillis = date.atStartOfDay(zone).toInstant().toEpochMilli()
-            val inspection = inspections
-                .filter { it.inspectionDate == dayStartMillis }
-                .maxByOrNull { it.completedAt ?: 0L }
-            val defectsForDay = inspection?.let { inspectionRepository.getDefects(it.id) }.orEmpty()
-            DailyCheckSummary(
-                dateLabel = DateFormatting.formatDate(dayStartMillis),
-                dayOfWeekLabel = date.dayOfWeek.name.lowercase().replaceFirstChar { it.uppercase() },
-                completed = inspection != null,
-                completionTimeLabel = inspection?.completedAt?.let { DateFormatting.formatTime(it) },
-                odometer = inspection?.odometer,
-                hasDefect = defectsForDay.isNotEmpty(),
-                isQuickCheck = inspection?.isQuickCheck ?: false
+            inspections.filter { it.inspectionDate == dayStartMillis }.maxByOrNull { it.completedAt ?: 0L }
+        }
+        val resultsByDay: List<List<InspectionResultEntity>> = inspectionByDay.map { inspection ->
+            inspection?.let { inspectionRepository.getResults(it.id) }.orEmpty()
+        }
+
+        val dayHeaders = (0..6).map { offset ->
+            val date = weekStart.plusDays(offset.toLong())
+            val inspection = inspectionByDay[offset]
+            WeeklyReportDayHeader(
+                dayLetter = date.dayOfWeek.name.take(1),
+                dateLabel = date.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM")),
+                timeLabel = inspection?.completedAt?.let { DateFormatting.formatTime(it) },
+                odometerLabel = inspection?.let { "${it.odometer}mi" },
+                completed = inspection != null
             )
         }
 
-        val defectSummaries = inspections.flatMap { inspection ->
+        // Union of every checklist item seen across the week, in the order first encountered,
+        // so a checklist that changed mid-week (a new version) still produces one readable table.
+        val itemOrder = LinkedHashMap<String, String>() // itemName snapshot, keyed by checklistItemId
+        resultsByDay.forEach { dayResults ->
+            dayResults.sortedBy { it.displayOrderSnapshot }.forEach { result ->
+                itemOrder.putIfAbsent(result.checklistItemId, result.itemNameSnapshot)
+            }
+        }
+
+        val itemRows = itemOrder.map { (itemId, itemName) ->
+            val statuses = resultsByDay.mapIndexed { dayIndex, dayResults ->
+                if (inspectionByDay[dayIndex] == null) {
+                    ItemDayStatus.NOT_RECORDED
+                } else {
+                    when (dayResults.firstOrNull { it.checklistItemId == itemId }?.status) {
+                        InspectionResultStatus.DEFECT -> ItemDayStatus.DEFECT
+                        InspectionResultStatus.NOT_APPLICABLE -> ItemDayStatus.NOT_APPLICABLE
+                        InspectionResultStatus.OK -> ItemDayStatus.OK
+                        null -> ItemDayStatus.NOT_RECORDED
+                    }
+                }
+            }
+            WeeklyReportItemRow(itemName = itemName, statuses = statuses)
+        }
+
+        val defectSummaries = inspections.sortedBy { it.inspectionDate }.flatMap { inspection ->
             inspectionRepository.getDefects(inspection.id).map { defect ->
                 DefectSummary(
                     dateLabel = DateFormatting.formatDate(inspection.inspectionDate),
                     checklistItem = defect.checklistItemNameSnapshot,
                     description = defect.description,
-                    statusLabel = if (defect.status == DefectStatus.RESOLVED) "Resolved" else "Open"
+                    statusLabel = if (defect.status == DefectStatus.RESOLVED) "Resolved" else "Open",
+                    resolutionNote = defect.resolutionNote
                 )
             }
+        }
+
+        val driverSignatures = inspectionByDay.mapIndexedNotNull { offset, inspection ->
+            if (inspection?.completedAt == null) return@mapIndexedNotNull null
+            val date = weekStart.plusDays(offset.toLong())
+            "${date.dayOfWeek.name.take(3).lowercase().replaceFirstChar { it.uppercase() }} " +
+                "${DateFormatting.formatTime(inspection.completedAt)} ${inspection.driverNameSnapshot}"
         }
 
         val completedMileage = mileageEntries.filter { it.endMileage != null }
@@ -82,10 +123,12 @@ class ReportDataBuilder @Inject constructor(
             licensingAuthorityName = authority?.name,
             weekStartLabel = DateFormatting.formatDate(fromMillis),
             weekEndLabel = DateFormatting.formatDate(toMillis),
-            days = days,
+            dayHeaders = dayHeaders,
+            itemRows = itemRows,
             mileageTotalMiles = totalMiles,
             mileageBusinessMiles = businessMiles,
             defects = defectSummaries,
+            driverSignatures = driverSignatures,
             generatedAtLabel = DateFormatting.formatDateTime(clock.nowMillis())
         )
     }

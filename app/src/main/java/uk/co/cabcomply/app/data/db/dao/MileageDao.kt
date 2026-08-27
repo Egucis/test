@@ -35,6 +35,9 @@ interface MileageDao {
     @Query("SELECT * FROM mileage_entries WHERE vehicleId = :vehicleId ORDER BY entryDate DESC, startedAt DESC LIMIT 1")
     suspend fun getLatestForVehicle(vehicleId: String): MileageEntryEntity?
 
+    @Query("SELECT COUNT(*) FROM mileage_entries WHERE vehicleId = :vehicleId AND entryDate >= :dayStart AND entryDate <= :dayEnd")
+    suspend fun countForVehicleInDay(vehicleId: String, dayStart: Long, dayEnd: Long): Int
+
     @Query("SELECT * FROM mileage_entries WHERE isFlagged = 1 ORDER BY entryDate DESC")
     fun observeFlagged(): Flow<List<MileageEntryEntity>>
 
