@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExposedDropdownMenu
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -184,7 +185,7 @@ fun VehicleEditScreen(
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = authorityExpanded) },
                     modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
                 )
-                androidx.compose.material3.ExposedDropdownMenu(expanded = authorityExpanded, onDismissRequest = { authorityExpanded = false }) {
+                ExposedDropdownMenu(expanded = authorityExpanded, onDismissRequest = { authorityExpanded = false }) {
                     state.authorities.forEach { authority ->
                         DropdownMenuItem(text = { Text(authority.name) }, onClick = { viewModel.onAuthorityChange(authority.id); authorityExpanded = false })
                     }

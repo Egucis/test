@@ -13,12 +13,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.ExposedDropdownMenu
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -185,8 +190,8 @@ fun DocumentEditScreen(
                 modifier = Modifier.weight(1f)
             )
             if (state.documentId != null) {
-                androidx.compose.material3.IconButton(onClick = viewModel::requestDelete) {
-                    androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Filled.Delete, contentDescription = "Delete document")
+                IconButton(onClick = viewModel::requestDelete) {
+                    Icon(Icons.Filled.Delete, contentDescription = "Delete document")
                 }
             }
         }
@@ -202,7 +207,7 @@ fun DocumentEditScreen(
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeExpanded) },
                     modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
                 )
-                androidx.compose.material3.ExposedDropdownMenu(expanded = typeExpanded, onDismissRequest = { typeExpanded = false }) {
+                ExposedDropdownMenu(expanded = typeExpanded, onDismissRequest = { typeExpanded = false }) {
                     DocumentType.entries.forEach { type ->
                         DropdownMenuItem(
                             text = { Text(type.name.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() }) },

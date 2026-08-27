@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.verticalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.ExposedDropdownMenu
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenuItem
@@ -120,7 +121,7 @@ fun OnboardingDriverScreen(
                     .fillMaxWidth()
                     .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
             )
-            androidx.compose.material3.ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 state.authorities.forEach { authority ->
                     DropdownMenuItem(
                         text = { Text(authority.name) },
