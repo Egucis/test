@@ -43,6 +43,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import uk.co.cabcomply.app.R
 import uk.co.cabcomply.app.ui.components.EmptyState
 import uk.co.cabcomply.app.ui.components.PrimaryActionButton
+import uk.co.cabcomply.app.ui.components.SecondaryActionButton
 import uk.co.cabcomply.app.ui.components.SectionCard
 import uk.co.cabcomply.app.ui.components.StatusChip
 import uk.co.cabcomply.app.ui.components.StatusTone
@@ -51,6 +52,7 @@ import uk.co.cabcomply.app.util.DateFormatting
 @Composable
 fun HomeScreen(
     onStartDailyCheck: (vehicleId: String) -> Unit,
+    onQuickCheck: (vehicleId: String) -> Unit,
     onOpenTodayCheck: (inspectionId: String) -> Unit,
     onNavigateMileage: () -> Unit,
     onNavigateDefects: () -> Unit,
@@ -83,6 +85,7 @@ fun HomeScreen(
             TodayCheckCard(
                 state = state,
                 onStart = { state.activeVehicle?.let { onStartDailyCheck(it.id) } },
+                onQuickCheck = { state.activeVehicle?.let { onQuickCheck(it.id) } },
                 onOpenExisting = { state.todayInspection?.let { onOpenTodayCheck(it.id) } }
             )
         }
@@ -143,6 +146,7 @@ private fun HomeHeader(state: HomeUiState, viewModel: HomeViewModel) {
 private fun TodayCheckCard(
     state: HomeUiState,
     onStart: () -> Unit,
+    onQuickCheck: () -> Unit,
     onOpenExisting: () -> Unit
 ) {
     SectionCard {
@@ -156,6 +160,8 @@ private fun TodayCheckCard(
                 StatusChip("Not completed", StatusTone.WARNING)
                 Spacer(Modifier.height(16.dp))
                 PrimaryActionButton(text = "Start Daily Check", onClick = onStart)
+                Spacer(Modifier.height(8.dp))
+                SecondaryActionButton(text = "Quick Check", onClick = onQuickCheck)
             }
             TodayCheckState.COMPLETED_CLEAN -> {
                 StatusChip("Completed", StatusTone.SUCCESS)

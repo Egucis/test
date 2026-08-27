@@ -245,32 +245,46 @@ private fun ChecklistItemRow(item: ChecklistItemUi, viewModel: DailyCheckViewMod
             }
         }
         Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             val okSelected = item.status == InspectionResultStatus.OK
             val defectSelected = item.status == InspectionResultStatus.DEFECT
+            val naSelected = item.status == InspectionResultStatus.NOT_APPLICABLE
             Button(
                 onClick = { viewModel.markItemOk(item.id) },
                 modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (okSelected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surfaceVariant,
                     contentColor = if (okSelected) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             ) {
                 Icon(Icons.Filled.CheckCircle, contentDescription = null)
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(4.dp))
                 Text("OK")
             }
             Button(
                 onClick = { viewModel.markItemDefect(item.id) },
                 modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (defectSelected) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.surfaceVariant,
                     contentColor = if (defectSelected) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             ) {
                 Icon(Icons.Filled.Warning, contentDescription = null)
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(4.dp))
                 Text("Defect")
+            }
+            Button(
+                onClick = { viewModel.markItemNotApplicable(item.id) },
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (naSelected) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = if (naSelected) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            ) {
+                Text("N/A")
             }
         }
 
@@ -337,6 +351,7 @@ private fun ReviewStep(state: DailyCheckUiState, viewModel: DailyCheckViewModel)
             Text("Vehicle: ${state.vehicle?.registration}")
             Text("Mileage: ${state.odometerText}")
             Text("OK items: ${state.items.count { it.status == InspectionResultStatus.OK }}")
+            Text("Not applicable: ${state.items.count { it.status == InspectionResultStatus.NOT_APPLICABLE }}")
             Text(
                 "Defects: ${state.defectCount}",
                 color = if (state.defectCount > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface

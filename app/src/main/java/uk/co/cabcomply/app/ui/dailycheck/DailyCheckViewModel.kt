@@ -95,14 +95,32 @@ class DailyCheckViewModel @Inject constructor(
             val openDefects = defectRepository.observeOpenForVehicle(vehicleId)
 
             val lastOdometer = inspectionRepository.getLastKnownOdometer(vehicleId)
+
+            // Carry forward each item's outcome from the most recent completed check so the
+            // driver isn't re-judging the same vehicle from scratch every day: "Not applicable"
+            // items (e.g. equipment this vehicle doesn't have) stay N/A on every check, and Quick
+            // Check additionally pre-fills everything else as OK. A previous defect is never
+            // silently repeated — it always requires the driver to notice and re-mark it, backed
+            // by the open-defect banner shown before the checklist.
+            val lastResultByItemId = inspectionRepository.getLatestCompleted(vehicleId)
+                ?.let { inspectionRepository.getResults(it.id) }
+                ?.associate { it.checklistItemId to it.status }
+                .orEmpty()
+
             val items = checklistItems.map {
+                val lastStatus = lastResultByItemId[it.id]
+                val prefill = when {
+                    lastStatus == InspectionResultStatus.NOT_APPLICABLE -> InspectionResultStatus.NOT_APPLICABLE
+                    requestedQuickCheck -> InspectionResultStatus.OK
+                    else -> null
+                }
                 ChecklistItemUi(
                     id = it.id,
                     category = it.category,
                     name = it.name,
                     helpText = it.helpText,
                     displayOrder = it.displayOrder,
-                    status = if (requestedQuickCheck) InspectionResultStatus.OK else null
+                    status = prefill
                 )
             }
 
@@ -146,6 +164,10 @@ class DailyCheckViewModel @Inject constructor(
     }
 
     fun markItemDefect(itemId: String) = updateItem(itemId) { it.copy(status = InspectionResultStatus.DEFECT) }
+
+    fun markItemNotApplicable(itemId: String) = updateItem(itemId) {
+        it.copy(status = InspectionResultStatus.NOT_APPLICABLE, defectDescription = "", defectPhotoPaths = emptyList(), defectThumbnailPaths = emptyList())
+    }
 
     fun onDefectDescriptionChange(itemId: String, value: String) =
         updateItem(itemId) { it.copy(defectDescription = value) }

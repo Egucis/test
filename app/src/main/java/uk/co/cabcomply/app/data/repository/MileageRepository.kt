@@ -3,6 +3,7 @@ package uk.co.cabcomply.app.data.repository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import uk.co.cabcomply.app.data.db.dao.MileageDao
+import uk.co.cabcomply.app.data.db.dao.VehicleDao
 import uk.co.cabcomply.app.data.db.entity.MileageEntryEntity
 import uk.co.cabcomply.app.data.db.entity.MileagePurpose
 import uk.co.cabcomply.app.util.AppClock
@@ -15,6 +16,7 @@ private const val LARGE_JUMP_MILES = 500
 @Singleton
 class MileageRepository @Inject constructor(
     private val dao: MileageDao,
+    private val vehicleDao: VehicleDao,
     private val clock: AppClock
 ) {
     fun observeFiltered(vehicleId: String?, fromDate: Long?, toDate: Long?): Flow<List<MileageEntryEntity>> =
@@ -27,9 +29,17 @@ class MileageRepository @Inject constructor(
     suspend fun getById(id: String): MileageEntryEntity? = dao.getById(id)
     fun observeById(id: String): Flow<MileageEntryEntity?> = dao.observeById(id)
 
-    /** Previous valid end mileage for this vehicle only — never borrowed from another vehicle. */
-    suspend fun getSuggestedStartMileage(vehicleId: String): Int? =
-        dao.getLatestCompletedForVehicle(vehicleId)?.endMileage
+    /**
+     * The best known mileage for this vehicle only, whichever is more recent: the last completed
+     * mileage entry's end reading, or the vehicle's own odometer (kept in sync by both this
+     * repository and a completed daily check). Never borrowed from another vehicle.
+     */
+    suspend fun getSuggestedStartMileage(vehicleId: String): Int? {
+        val lastEntryEnd = dao.getLatestCompletedForVehicle(vehicleId)?.endMileage ?: 0
+        val vehicleOdometer = vehicleDao.getById(vehicleId)?.currentOdometer ?: 0
+        val suggestion = maxOf(lastEntryEnd, vehicleOdometer)
+        return if (suggestion > 0) suggestion else null
+    }
 
     suspend fun saveEntry(
         id: String?,
@@ -86,6 +96,17 @@ class MileageRepository @Inject constructor(
             createdAt = now
         )
         dao.upsert(entry)
+
+        // Keep the vehicle's own odometer in step with mileage entries too, so Daily Check's
+        // odometer prefill and this screen's start-mileage prefill never drift apart.
+        if (endMileage != null) {
+            vehicleDao.getById(vehicleId)?.let { vehicle ->
+                if (endMileage > vehicle.currentOdometer) {
+                    vehicleDao.upsert(vehicle.copy(currentOdometer = endMileage, updatedAt = now))
+                }
+            }
+        }
+
         return entry
     }
 }

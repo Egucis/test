@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.RemoveCircle
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -137,13 +138,17 @@ fun InspectionDetailScreen(onBack: () -> Unit, viewModel: InspectionDetailViewMo
                     Text(category, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
                     items.forEach { result ->
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
-                            Icon(
-                                if (result.status == InspectionResultStatus.DEFECT) Icons.Filled.Warning else Icons.Filled.CheckCircle,
-                                contentDescription = null,
-                                tint = if (result.status == InspectionResultStatus.DEFECT) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary
-                            )
+                            when (result.status) {
+                                InspectionResultStatus.DEFECT -> Icon(Icons.Filled.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                InspectionResultStatus.NOT_APPLICABLE -> Icon(Icons.Filled.RemoveCircle, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                InspectionResultStatus.OK -> Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                            }
                             Spacer(Modifier.width(8.dp))
                             Text(result.itemNameSnapshot, style = MaterialTheme.typography.bodyMedium)
+                            if (result.status == InspectionResultStatus.NOT_APPLICABLE) {
+                                Spacer(Modifier.width(6.dp))
+                                Text("(N/A)", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     }
                 }

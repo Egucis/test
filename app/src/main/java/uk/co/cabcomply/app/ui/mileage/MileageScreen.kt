@@ -111,63 +111,66 @@ fun MileageScreen(
     var hmrcExpanded by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize()) {
-        if (state.entries.isEmpty()) {
-            EmptyState(
-                title = "No mileage recorded yet",
-                message = "Record your start and end mileage to keep accurate records.",
-                actionLabel = "Add mileage",
-                onAction = onAddEntry,
-                modifier = Modifier.fillMaxSize()
-            )
-        } else {
-            LazyColumn(
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            item {
+                val tax = UkTaxYear.forDate(java.time.LocalDate.now())
+                SectionCard(modifier = Modifier.clickable { hmrcExpanded = !hmrcExpanded }) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "HMRC Mileage · ${tax.label} · ${state.currentTaxYearBusiness} miles",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        Icon(if (hmrcExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = null)
+                    }
+                    if (hmrcExpanded) {
+                        Spacer(Modifier.height(10.dp))
+                        Text("Total miles this tax year: ${state.currentTaxYearTotal}", style = MaterialTheme.typography.bodyMedium)
+                        Text("Business miles this tax year: ${state.currentTaxYearBusiness}", style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+            if (state.flagged.isNotEmpty()) {
                 item {
-                    val tax = UkTaxYear.forDate(java.time.LocalDate.now())
-                    SectionCard(modifier = Modifier.clickable { hmrcExpanded = !hmrcExpanded }) {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    "HMRC Mileage · ${tax.label} · ${state.currentTaxYearBusiness} miles",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                            Icon(if (hmrcExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = null)
+                    SectionCard {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Filled.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "${state.flagged.size} mileage entr${if (state.flagged.size == 1) "y needs" else "ies need"} review",
+                                style = MaterialTheme.typography.titleMedium
+                            )
                         }
-                        if (hmrcExpanded) {
-                            Spacer(Modifier.height(10.dp))
-                            Text("Total miles this tax year: ${state.currentTaxYearTotal}", style = MaterialTheme.typography.bodyMedium)
-                            Text("Business miles this tax year: ${state.currentTaxYearBusiness}", style = MaterialTheme.typography.bodyMedium)
-                        }
-                    }
-                }
-                if (state.flagged.isNotEmpty()) {
-                    item {
-                        SectionCard {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Filled.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    "${state.flagged.size} mileage entr${if (state.flagged.size == 1) "y needs" else "ies need"} review",
-                                    style = MaterialTheme.typography.titleMedium
-                                )
-                            }
-                            Spacer(Modifier.height(8.dp))
-                            state.flagged.forEach { entry ->
-                                Text(
-                                    "${DateFormatting.formatDate(entry.entryDate)}: ${entry.flagReason}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    modifier = Modifier
-                                        .clickable { onOpenEntry(entry.id) }
-                                        .padding(vertical = 4.dp)
-                                )
-                            }
+                        Spacer(Modifier.height(8.dp))
+                        state.flagged.forEach { entry ->
+                            Text(
+                                "${DateFormatting.formatDate(entry.entryDate)}: ${entry.flagReason}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier
+                                    .clickable { onOpenEntry(entry.id) }
+                                    .padding(vertical = 4.dp)
+                            )
                         }
                     }
                 }
+            }
+            if (state.entries.isEmpty()) {
+                item {
+                    EmptyState(
+                        title = "No mileage recorded yet",
+                        message = "Record your start and end mileage to keep accurate records.",
+                        actionLabel = "Add mileage",
+                        onAction = onAddEntry,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            } else {
                 items(state.entries, key = { it.id }) { entry ->
                     SectionCard(modifier = Modifier.clickable { onOpenEntry(entry.id) }) {
                         Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {

@@ -116,6 +116,7 @@ private fun CabComplyNavGraph(startDestination: String) {
             composable(Destinations.HOME) {
                 HomeScreen(
                     onStartDailyCheck = { vehicleId -> navController.navigate(Destinations.dailyCheck(vehicleId)) },
+                    onQuickCheck = { vehicleId -> navController.navigate(Destinations.dailyCheck(vehicleId, quick = true)) },
                     onOpenTodayCheck = { inspectionId -> navController.navigate(Destinations.inspectionDetail(inspectionId)) },
                     onNavigateMileage = { navController.navigate(Destinations.MILEAGE) },
                     onNavigateDefects = { navController.navigate(Destinations.DEFECTS) },
