@@ -1,5 +1,6 @@
 package uk.co.cabcomply.app.ui.history
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -42,13 +43,17 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import uk.co.cabcomply.app.data.db.entity.DefectEntity
+import uk.co.cabcomply.app.data.db.entity.DefectStatus
 import uk.co.cabcomply.app.data.db.entity.InspectionEntity
 import uk.co.cabcomply.app.data.db.entity.InspectionResultEntity
 import uk.co.cabcomply.app.data.db.entity.InspectionResultStatus
+import uk.co.cabcomply.app.data.repository.DefectRepository
 import uk.co.cabcomply.app.data.repository.InspectionRepository
 import uk.co.cabcomply.app.data.security.PinManager
 import uk.co.cabcomply.app.ui.components.PinChallengeDialog
 import uk.co.cabcomply.app.ui.components.SectionCard
+import uk.co.cabcomply.app.ui.components.StatusChip
+import uk.co.cabcomply.app.ui.components.StatusTone
 import uk.co.cabcomply.app.util.DateFormatting
 import javax.inject.Inject
 
@@ -63,6 +68,7 @@ data class InspectionDetailUiState(
 class InspectionDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val inspectionRepository: InspectionRepository,
+    private val defectRepository: DefectRepository,
     val pinManager: PinManager
 ) : ViewModel() {
 
@@ -74,8 +80,14 @@ class InspectionDetailViewModel @Inject constructor(
         viewModelScope.launch {
             val inspection = inspectionRepository.getById(inspectionId)
             val results = inspectionRepository.getResults(inspectionId)
-            val defects = inspectionRepository.getDefects(inspectionId)
-            _state.value = InspectionDetailUiState(inspection, results, defects, isLoading = false)
+            _state.value = _state.value.copy(inspection = inspection, results = results)
+        }
+        // Reactive so resolving a defect (from here or the separate Defects screen) shows up
+        // immediately without needing to leave and re-enter this screen.
+        viewModelScope.launch {
+            defectRepository.observeForInspection(inspectionId).collect { defects ->
+                _state.value = _state.value.copy(defects = defects, isLoading = false)
+            }
         }
     }
 
@@ -89,7 +101,11 @@ class InspectionDetailViewModel @Inject constructor(
 }
 
 @Composable
-fun InspectionDetailScreen(onBack: () -> Unit, viewModel: InspectionDetailViewModel = hiltViewModel()) {
+fun InspectionDetailScreen(
+    onBack: () -> Unit,
+    onOpenDefect: (String) -> Unit,
+    viewModel: InspectionDetailViewModel = hiltViewModel()
+) {
     val state by viewModel.state.collectAsState()
     var showAmendDialog by remember { mutableStateOf(false) }
     var pinChallenge by remember { mutableStateOf(false) }
@@ -158,11 +174,31 @@ fun InspectionDetailScreen(onBack: () -> Unit, viewModel: InspectionDetailViewMo
             item {
                 SectionCard {
                     Text("Defects", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Tap a defect to add a resolution note or mark it fixed.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     Spacer(Modifier.height(8.dp))
                     state.defects.forEach { defect ->
-                        Text(defect.checklistItemNameSnapshot, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                        Text(defect.description, style = MaterialTheme.typography.bodyMedium)
-                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onOpenDefect(defect.id) }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(defect.checklistItemNameSnapshot, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                                Text(defect.description, style = MaterialTheme.typography.bodyMedium)
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            StatusChip(
+                                text = if (defect.status == DefectStatus.RESOLVED) "Resolved" else "Open",
+                                tone = if (defect.status == DefectStatus.RESOLVED) StatusTone.SUCCESS else StatusTone.DANGER
+                            )
+                        }
                     }
                 }
             }

@@ -43,6 +43,9 @@ interface DefectDao {
     @Query("SELECT * FROM defects WHERE inspectionId = :inspectionId")
     suspend fun getForInspection(inspectionId: String): List<DefectEntity>
 
+    @Query("SELECT * FROM defects WHERE inspectionId = :inspectionId ORDER BY reportedAt DESC")
+    fun observeForInspection(inspectionId: String): Flow<List<DefectEntity>>
+
     @Query("SELECT * FROM defects")
     suspend fun getAll(): List<DefectEntity>
 

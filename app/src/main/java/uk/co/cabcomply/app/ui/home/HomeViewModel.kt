@@ -20,6 +20,7 @@ import uk.co.cabcomply.app.data.repository.DefectRepository
 import uk.co.cabcomply.app.data.repository.DocumentExpiryStatus
 import uk.co.cabcomply.app.data.repository.DocumentRepository
 import uk.co.cabcomply.app.data.repository.InspectionRepository
+import uk.co.cabcomply.app.data.repository.MileageRepository
 import uk.co.cabcomply.app.data.repository.VehicleRepository
 import uk.co.cabcomply.app.data.repository.expiryStatusFor
 import uk.co.cabcomply.app.util.AppClock
@@ -33,10 +34,18 @@ data class HomeUiState(
     val todayInspection: InspectionEntity? = null,
     val todayCheckState: TodayCheckState = TodayCheckState.NOT_STARTED,
     val openDefectCount: Int = 0,
+    val incompleteMileageCount: Int = 0,
     val documentsExpiringSoon: Int = 0,
     val documentsExpired: Int = 0,
     val documentsValid: Int = 0,
     val isLoading: Boolean = true
+)
+
+private data class ActiveVehicleSnapshot(
+    val todayInspection: InspectionEntity?,
+    val openDefects: List<DefectEntity>,
+    val incompleteMileageCount: Int,
+    val vehicle: VehicleEntity?
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -46,6 +55,7 @@ class HomeViewModel @Inject constructor(
     private val inspectionRepository: InspectionRepository,
     private val defectRepository: DefectRepository,
     private val documentRepository: DocumentRepository,
+    private val mileageRepository: MileageRepository,
     private val clock: AppClock
 ) : ViewModel() {
 
@@ -53,20 +63,28 @@ class HomeViewModel @Inject constructor(
         vehicleRepository.observeActiveVehicles(),
         vehicleRepository.observeActiveVehicle().flatMapLatest { vehicle ->
             if (vehicle == null) {
-                flowOf(Triple<InspectionEntity?, List<DefectEntity>, VehicleEntity?>(null, emptyList(), null))
+                flowOf(ActiveVehicleSnapshot(null, emptyList(), 0, null))
             } else {
                 val dayStart = clock.startOfDay()
                 val dayEnd = dayStart + 86_400_000L - 1
                 combine(
                     inspectionRepository.observeHistory(vehicle.id, dayStart, dayEnd),
-                    defectRepository.observeOpenForVehicle(vehicle.id)
-                ) { inspections, defects ->
-                    Triple(inspections.maxByOrNull { it.completedAt ?: 0L }, defects, vehicle)
+                    defectRepository.observeOpenForVehicle(vehicle.id),
+                    // Mileage entries from before today that were never given an end reading -
+                    // e.g. yesterday's Daily Check opened one and the driver never closed it out.
+                    mileageRepository.observeFiltered(vehicle.id, null, dayStart - 1)
+                ) { inspections, defects, priorMileage ->
+                    ActiveVehicleSnapshot(
+                        todayInspection = inspections.maxByOrNull { it.completedAt ?: 0L },
+                        openDefects = defects,
+                        incompleteMileageCount = priorMileage.count { it.endMileage == null },
+                        vehicle = vehicle
+                    )
                 }
             }
         },
         documentRepository.observeAll()
-    ) { allVehicles, (todayInspection, openDefects, activeVehicle), documents ->
+    ) { allVehicles, snapshot, documents ->
         val now = clock.nowMillis()
         var expiringSoon = 0
         var expired = 0
@@ -80,16 +98,17 @@ class HomeViewModel @Inject constructor(
             }
         }
         val checkState = when {
-            todayInspection == null -> TodayCheckState.NOT_STARTED
-            openDefects.any { it.inspectionId == todayInspection.id } -> TodayCheckState.COMPLETED_WITH_DEFECT
+            snapshot.todayInspection == null -> TodayCheckState.NOT_STARTED
+            snapshot.openDefects.any { it.inspectionId == snapshot.todayInspection.id } -> TodayCheckState.COMPLETED_WITH_DEFECT
             else -> TodayCheckState.COMPLETED_CLEAN
         }
         HomeUiState(
-            activeVehicle = activeVehicle,
-            otherVehicles = allVehicles.filter { it.id != activeVehicle?.id },
-            todayInspection = todayInspection,
+            activeVehicle = snapshot.vehicle,
+            otherVehicles = allVehicles.filter { it.id != snapshot.vehicle?.id },
+            todayInspection = snapshot.todayInspection,
             todayCheckState = checkState,
-            openDefectCount = openDefects.size,
+            openDefectCount = snapshot.openDefects.size,
+            incompleteMileageCount = snapshot.incompleteMileageCount,
             documentsExpiringSoon = expiringSoon,
             documentsExpired = expired,
             documentsValid = valid,

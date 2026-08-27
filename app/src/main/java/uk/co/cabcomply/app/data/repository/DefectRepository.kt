@@ -22,6 +22,7 @@ class DefectRepository @Inject constructor(
         defectDao.observeFiltered(status, vehicleId)
 
     fun observeOpenForVehicle(vehicleId: String): Flow<List<DefectEntity>> = defectDao.observeOpenForVehicle(vehicleId)
+    fun observeForInspection(inspectionId: String): Flow<List<DefectEntity>> = defectDao.observeForInspection(inspectionId)
     suspend fun countOpenForVehicle(vehicleId: String): Int = defectDao.countOpenForVehicle(vehicleId)
     fun observeOpenCount(): Flow<Int> = defectDao.observeOpenCount()
     suspend fun getById(id: String): DefectEntity? = defectDao.getById(id)

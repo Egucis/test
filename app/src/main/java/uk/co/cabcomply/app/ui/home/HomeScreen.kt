@@ -92,6 +92,7 @@ fun HomeScreen(
         item {
             QuickActionsGrid(
                 openDefects = state.openDefectCount,
+                incompleteMileageCount = state.incompleteMileageCount,
                 documentsNeedingAttention = state.documentsExpiringSoon + state.documentsExpired,
                 onMileage = onNavigateMileage,
                 onDefects = onNavigateDefects,
@@ -188,6 +189,7 @@ private fun TodayCheckCard(
 @Composable
 private fun QuickActionsGrid(
     openDefects: Int,
+    incompleteMileageCount: Int,
     documentsNeedingAttention: Int,
     onMileage: () -> Unit,
     onDefects: () -> Unit,
@@ -196,7 +198,14 @@ private fun QuickActionsGrid(
     onOfficerMode: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        QuickActionRow("Mileage", "Record start/end mileage", Icons.Filled.Speed, null, onMileage)
+        QuickActionRow(
+            "Mileage",
+            if (incompleteMileageCount == 0) "Record start/end mileage" else
+                "$incompleteMileageCount earlier record${if (incompleteMileageCount == 1) "" else "s"} missing an end reading",
+            Icons.Filled.Speed,
+            if (incompleteMileageCount > 0) StatusTone.WARNING else null,
+            onMileage
+        )
         QuickActionRow(
             "Defects",
             if (openDefects == 0) "No open defects" else "$openDefects open defect${if (openDefects == 1) "" else "s"}",

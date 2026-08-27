@@ -156,7 +156,10 @@ private fun CabComplyNavGraph(startDestination: String) {
                 Destinations.INSPECTION_DETAIL,
                 arguments = listOf(navArgument("inspectionId") { type = NavType.StringType })
             ) {
-                InspectionDetailScreen(onBack = { navController.popBackStack() })
+                InspectionDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenDefect = { navController.navigate(Destinations.defectDetail(it)) }
+                )
             }
 
             // Mileage
