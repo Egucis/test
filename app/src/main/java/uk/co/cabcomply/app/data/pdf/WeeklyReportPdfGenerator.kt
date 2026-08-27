@@ -217,7 +217,7 @@ class WeeklyReportPdfGenerator @Inject constructor(
         paint.textAlign = align
     }
 
-    private fun ellipsize(text: String, paint: Paint, maxWidth: Float): String =
+    private fun ellipsize(text: String, paint: TextPaint, maxWidth: Float): String =
         TextUtils.ellipsize(text, paint, maxWidth, TextUtils.TruncateAt.END).toString()
 
     private fun buildLayout(text: String, paint: TextPaint, width: Float): StaticLayout =
