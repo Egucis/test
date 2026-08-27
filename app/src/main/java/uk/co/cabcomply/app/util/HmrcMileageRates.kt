@@ -5,23 +5,34 @@ package uk.co.cabcomply.app.util
  * for the first 10,000 miles in a tax year, 25p per mile after that. Kept entirely separate from
  * [uk.co.cabcomply.app.data.db.entity.MileageEntryEntity] so a future rate change only affects
  * how existing mileage is *valued*, never the raw recorded miles themselves (product spec
- * section 30).
+ * section 30). The rate is expressed as a [RateProfile] rather than hardcoded constants so a
+ * driver can correct it from the Mileage screen the day HMRC changes it, without waiting on an
+ * app update — see [uk.co.cabcomply.app.data.mileage.HmrcRateRepository].
  */
 object HmrcMileageRates {
-    private const val TIER_1_RATE_PENCE = 45
-    private const val TIER_2_RATE_PENCE = 25
-    private const val TIER_1_THRESHOLD_MILES = 10_000
+    data class RateProfile(
+        val tier1Pence: Int,
+        val tier2Pence: Int,
+        val thresholdMiles: Int
+    )
+
+    /** CabComply's built-in default, applied whenever a driver hasn't overridden a tax year. */
+    fun defaultProfile(taxYearStart: Int): RateProfile = RateProfile(
+        tier1Pence = 45,
+        tier2Pence = 25,
+        thresholdMiles = 10_000
+    )
 
     /**
      * The allowance, in pence, for [milesInThisSegment] business miles that follow
      * [milesAlreadyClaimedThisTaxYear] miles already claimed earlier in the same tax year -
-     * splitting the segment across the 45p/25p tiers where it crosses the 10,000-mile threshold.
+     * splitting the segment across [profile]'s two tiers where it crosses the threshold.
      */
-    fun estimateAllowancePence(milesAlreadyClaimedThisTaxYear: Int, milesInThisSegment: Int): Int {
+    fun estimateAllowancePence(profile: RateProfile, milesAlreadyClaimedThisTaxYear: Int, milesInThisSegment: Int): Int {
         if (milesInThisSegment <= 0) return 0
-        val remainingAtTier1 = (TIER_1_THRESHOLD_MILES - milesAlreadyClaimedThisTaxYear).coerceIn(0, milesInThisSegment)
+        val remainingAtTier1 = (profile.thresholdMiles - milesAlreadyClaimedThisTaxYear).coerceIn(0, milesInThisSegment)
         val milesAtTier2 = milesInThisSegment - remainingAtTier1
-        return remainingAtTier1 * TIER_1_RATE_PENCE + milesAtTier2 * TIER_2_RATE_PENCE
+        return remainingAtTier1 * profile.tier1Pence + milesAtTier2 * profile.tier2Pence
     }
 
     fun formatPence(pence: Int): String {

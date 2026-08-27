@@ -41,6 +41,9 @@ interface MileageDao {
     @Query("SELECT * FROM mileage_entries WHERE isFlagged = 1 ORDER BY entryDate DESC")
     fun observeFlagged(): Flow<List<MileageEntryEntity>>
 
+    @Query("SELECT * FROM mileage_entries WHERE vehicleId = :vehicleId")
+    suspend fun getAllForVehicle(vehicleId: String): List<MileageEntryEntity>
+
     @Query("SELECT * FROM mileage_entries")
     suspend fun getAll(): List<MileageEntryEntity>
 

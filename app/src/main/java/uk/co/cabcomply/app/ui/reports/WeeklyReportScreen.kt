@@ -2,9 +2,6 @@ package uk.co.cabcomply.app.ui.reports
 
 import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.Color
-import android.graphics.pdf.PdfRenderer
-import android.os.ParcelFileDescriptor
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -54,6 +51,7 @@ import uk.co.cabcomply.app.data.pdf.ReportDataBuilder
 import uk.co.cabcomply.app.data.pdf.WeeklyReportData
 import uk.co.cabcomply.app.data.pdf.WeeklyReportPdfGenerator
 import uk.co.cabcomply.app.ui.components.PrimaryActionButton
+import uk.co.cabcomply.app.util.PdfPageRenderer
 import java.io.File
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -89,32 +87,13 @@ class ReportsViewModel @Inject constructor(
             _state.value = _state.value.copy(report = report)
 
             val file = withContext(Dispatchers.IO) { pdfGenerator.generate(report) }
-            val bitmaps = withContext(Dispatchers.IO) { renderPdfPages(file) }
+            val bitmaps = withContext(Dispatchers.IO) { PdfPageRenderer.renderPages(file) }
             _state.value = _state.value.copy(pdfFile = file, pageBitmaps = bitmaps, isLoading = false)
         }
     }
 
     fun previousWeek() { _state.value = _state.value.copy(weekStart = _state.value.weekStart.minusWeeks(1)); loadWeek() }
     fun nextWeek() { _state.value = _state.value.copy(weekStart = _state.value.weekStart.plusWeeks(1)); loadWeek() }
-
-    private fun renderPdfPages(file: File, targetWidthPx: Int = 1080): List<Bitmap> {
-        val bitmaps = mutableListOf<Bitmap>()
-        ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
-            PdfRenderer(pfd).use { renderer ->
-                for (i in 0 until renderer.pageCount) {
-                    renderer.openPage(i).use { page ->
-                        val scale = targetWidthPx.toFloat() / page.width
-                        val targetHeightPx = (page.height * scale).toInt().coerceAtLeast(1)
-                        val bitmap = Bitmap.createBitmap(targetWidthPx, targetHeightPx, Bitmap.Config.ARGB_8888)
-                        bitmap.eraseColor(Color.WHITE)
-                        page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                        bitmaps.add(bitmap)
-                    }
-                }
-            }
-        }
-        return bitmaps
-    }
 }
 
 @Composable

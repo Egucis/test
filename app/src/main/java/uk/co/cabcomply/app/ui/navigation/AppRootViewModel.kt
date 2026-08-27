@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import uk.co.cabcomply.app.data.backup.CloudBackupPrefs
+import uk.co.cabcomply.app.data.backup.CloudBackupScheduler
 import uk.co.cabcomply.app.data.billing.EntitlementManager
 import uk.co.cabcomply.app.data.notifications.NotificationPreferences
 import uk.co.cabcomply.app.data.notifications.NotificationScheduler
@@ -23,7 +25,9 @@ class AppRootViewModel @Inject constructor(
     val appLockManager: AppLockManager,
     private val entitlementManager: EntitlementManager,
     private val notificationPreferences: NotificationPreferences,
-    private val notificationScheduler: NotificationScheduler
+    private val notificationScheduler: NotificationScheduler,
+    private val cloudBackupPrefs: CloudBackupPrefs,
+    private val cloudBackupScheduler: CloudBackupScheduler
 ) : ViewModel() {
 
     private val _needsOnboarding = MutableStateFlow<Boolean?>(null)
@@ -38,6 +42,11 @@ class AppRootViewModel @Inject constructor(
             entitlementManager.refresh()
             if (notificationPreferences.remindersEnabled.first()) {
                 notificationScheduler.ensureScheduled()
+            }
+            // Re-arms automatic backup on every launch too, so a reboot that cleared
+            // WorkManager's schedule never silently and permanently disables it.
+            if (cloudBackupPrefs.current().enabled) {
+                cloudBackupScheduler.ensureScheduled()
             }
         }
     }

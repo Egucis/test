@@ -20,6 +20,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -28,6 +29,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import uk.co.cabcomply.app.data.security.AppLockManager
+import uk.co.cabcomply.app.data.security.BiometricAuth
 import uk.co.cabcomply.app.data.security.PinManager
 import uk.co.cabcomply.app.ui.components.SectionCard
 import javax.inject.Inject
@@ -54,6 +56,12 @@ class SettingsSecurityViewModel @Inject constructor(
         _refreshTick.value++
     }
 
+    fun setBiometricUnlockEnabled(enabled: Boolean) {
+        if (enabled && !pinManager.isPinSet()) return
+        pinManager.biometricUnlockEnabled = enabled
+        _refreshTick.value++
+    }
+
     fun disableAllProtection() {
         pinManager.disablePinProtection()
         appLockManager.clearLockIfProtectionDisabled()
@@ -72,6 +80,7 @@ fun SettingsSecurityScreen(
     viewModel.refreshTick.collectAsState()
     var showDisableConfirm by remember { mutableStateOf(false) }
     val pinManager = viewModel.pinManager
+    val biometricAvailable = BiometricAuth.isAvailable(LocalContext.current)
 
     Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
         Text("Security", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
@@ -98,6 +107,20 @@ fun SettingsSecurityScreen(
                         Text("Require your PIN to edit records, delete data or leave Officer Mode.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(checked = pinManager.recordProtectionEnabled, onCheckedChange = viewModel::setRecordProtectionEnabled)
+                }
+                if (biometricAvailable) {
+                    Spacer(Modifier.height(16.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Unlock with fingerprint/face", fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "Offered as a faster alternative to your PIN — your PIN always still works.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(checked = pinManager.biometricUnlockEnabled, onCheckedChange = viewModel::setBiometricUnlockEnabled)
+                    }
                 }
                 Spacer(Modifier.height(16.dp))
                 TextButton(onClick = onChangePin) { Text("Change PIN") }

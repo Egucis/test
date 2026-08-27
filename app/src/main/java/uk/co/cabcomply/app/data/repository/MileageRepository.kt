@@ -8,10 +8,9 @@ import uk.co.cabcomply.app.data.db.entity.MileageEntryEntity
 import uk.co.cabcomply.app.data.db.entity.MileagePurpose
 import uk.co.cabcomply.app.util.AppClock
 import uk.co.cabcomply.app.util.Ids
+import uk.co.cabcomply.app.util.MileageConsistency
 import javax.inject.Inject
 import javax.inject.Singleton
-
-private const val LARGE_JUMP_MILES = 500
 
 @Singleton
 class MileageRepository @Inject constructor(
@@ -52,24 +51,9 @@ class MileageRepository @Inject constructor(
         purpose: MileagePurpose,
         notes: String?
     ): MileageEntryEntity {
-        val previous = dao.getLatestCompletedForVehicle(vehicleId)
-        val flags = mutableListOf<String>()
-
-        if (endMileage != null && endMileage < startMileage) {
-            flags += "End mileage ($endMileage) is lower than start mileage ($startMileage)."
-        }
-        if (previous != null && previous.endMileage != null && id != previous.id && startMileage < previous.endMileage) {
-            flags += "Start mileage ($startMileage) is lower than the last recorded end mileage (${previous.endMileage}) for this vehicle."
-        }
-        if (endMileage != null) {
-            val distance = endMileage - startMileage
-            if (distance > LARGE_JUMP_MILES) {
-                flags += "This entry covers $distance miles, which is unusually large for one segment."
-            }
-        }
-
         val now = clock.nowMillis()
         val existing = id?.let { dao.getById(it) }
+        val savedId = existing?.id ?: Ids.newId()
         val entry = existing?.copy(
             vehicleId = vehicleId,
             startMileage = startMileage,
@@ -78,11 +62,9 @@ class MileageRepository @Inject constructor(
             startedAt = startedAt,
             endedAt = endedAt,
             purpose = purpose,
-            notes = notes,
-            isFlagged = flags.isNotEmpty(),
-            flagReason = flags.joinToString(" ").ifBlank { null }
+            notes = notes
         ) ?: MileageEntryEntity(
-            id = Ids.newId(),
+            id = savedId,
             vehicleId = vehicleId,
             startMileage = startMileage,
             endMileage = endMileage,
@@ -91,8 +73,8 @@ class MileageRepository @Inject constructor(
             endedAt = endedAt,
             purpose = purpose,
             notes = notes,
-            isFlagged = flags.isNotEmpty(),
-            flagReason = flags.joinToString(" ").ifBlank { null },
+            isFlagged = false,
+            flagReason = null,
             createdAt = now
         )
         dao.upsert(entry)
@@ -107,7 +89,21 @@ class MileageRepository @Inject constructor(
             }
         }
 
-        return entry
+        // Re-derive flags for the whole vehicle, not just this entry: editing an earlier
+        // entry can create (or resolve) an overlap with entries that come after it.
+        reconcileFlags(vehicleId)
+        return dao.getById(savedId) ?: entry
+    }
+
+    private suspend fun reconcileFlags(vehicleId: String) {
+        val all = dao.getAllForVehicle(vehicleId)
+        val reasonsByEntryId = MileageConsistency.analyse(all)
+        all.forEach { entry ->
+            val reason = reasonsByEntryId[entry.id]
+            if (entry.isFlagged != (reason != null) || entry.flagReason != reason) {
+                dao.upsert(entry.copy(isFlagged = reason != null, flagReason = reason))
+            }
+        }
     }
 
     /**
@@ -136,5 +132,6 @@ class MileageRepository @Inject constructor(
                 createdAt = timestamp
             )
         )
+        reconcileFlags(vehicleId)
     }
 }

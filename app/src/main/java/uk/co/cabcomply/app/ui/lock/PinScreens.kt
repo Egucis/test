@@ -15,6 +15,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,16 +23,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import uk.co.cabcomply.app.R
 import uk.co.cabcomply.app.data.security.AppLockManager
+import uk.co.cabcomply.app.data.security.BiometricAuth
 import uk.co.cabcomply.app.data.security.PinManager
 import uk.co.cabcomply.app.ui.components.PrimaryActionButton
 import uk.co.cabcomply.app.ui.components.SecondaryActionButton
@@ -48,6 +52,23 @@ class PinLockViewModel @Inject constructor(
 fun PinLockScreen(viewModel: PinLockViewModel = hiltViewModel()) {
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+    val activity = context as? FragmentActivity
+    val biometricEnabled = viewModel.pinManager.biometricUnlockEnabled && activity != null && BiometricAuth.isAvailable(context)
+
+    fun promptBiometric() {
+        if (activity == null) return
+        BiometricAuth.prompt(
+            activity = activity,
+            title = "Unlock CabComply",
+            onSuccess = { viewModel.appLockManager.unlock() },
+            onError = { error = it }
+        )
+    }
+
+    LaunchedEffect(biometricEnabled) {
+        if (biometricEnabled) promptBiometric()
+    }
 
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
@@ -81,6 +102,10 @@ fun PinLockScreen(viewModel: PinLockViewModel = hiltViewModel()) {
                     error = "Incorrect PIN. Please try again."
                 }
             })
+            if (biometricEnabled) {
+                Spacer(Modifier.height(8.dp))
+                SecondaryActionButton(text = "Use biometric unlock", onClick = { promptBiometric() })
+            }
         }
     }
 }

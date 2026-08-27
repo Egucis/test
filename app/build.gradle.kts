@@ -90,8 +90,15 @@ dependencies {
     implementation("androidx.hilt:hilt-work:1.2.0")
     ksp("androidx.hilt:hilt-compiler:1.2.0")
 
-    // WorkManager (expiry reminders)
+    // WorkManager (expiry reminders, automatic cloud backup)
     implementation("androidx.work:work-runtime-ktx:2.9.1")
+
+    // SAF folder access for automatic cloud/folder backup
+    implementation("androidx.documentfile:documentfile:1.0.1")
+
+    // Biometric unlock (app lock, Officer Mode) - requires FragmentActivity, hence fragment-ktx
+    implementation("androidx.biometric:biometric:1.1.0")
+    implementation("androidx.fragment:fragment-ktx:1.8.2")
 
     // DataStore (lightweight settings/entitlement cache)
     implementation("androidx.datastore:datastore-preferences:1.1.1")

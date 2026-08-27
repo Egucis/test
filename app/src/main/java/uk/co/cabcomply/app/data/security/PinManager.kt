@@ -46,6 +46,11 @@ class PinManager @Inject constructor(
         get() = isPinSet() && prefs.getBoolean(KEY_RECORD_PROTECTION_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_RECORD_PROTECTION_ENABLED, value).apply()
 
+    /** Opt-in fingerprint/face unlock as a faster alternative to the PIN, wherever the PIN is asked for. */
+    var biometricUnlockEnabled: Boolean
+        get() = isPinSet() && prefs.getBoolean(KEY_BIOMETRIC_UNLOCK_ENABLED, false)
+        set(value) = prefs.edit().putBoolean(KEY_BIOMETRIC_UNLOCK_ENABLED, value).apply()
+
     fun setPin(pin: String) {
         require(pin.length in 4..8 && pin.all { it.isDigit() }) { "PIN must be 4 to 8 digits." }
         val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
@@ -77,6 +82,7 @@ class PinManager @Inject constructor(
             .remove(KEY_HASH)
             .putBoolean(KEY_APP_LOCK_ENABLED, false)
             .putBoolean(KEY_RECORD_PROTECTION_ENABLED, false)
+            .putBoolean(KEY_BIOMETRIC_UNLOCK_ENABLED, false)
             .apply()
     }
 
@@ -91,5 +97,6 @@ class PinManager @Inject constructor(
         const val KEY_HASH = "pin_hash"
         const val KEY_APP_LOCK_ENABLED = "app_lock_enabled"
         const val KEY_RECORD_PROTECTION_ENABLED = "record_protection_enabled"
+        const val KEY_BIOMETRIC_UNLOCK_ENABLED = "biometric_unlock_enabled"
     }
 }

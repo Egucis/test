@@ -1,6 +1,7 @@
 package uk.co.cabcomply.app.ui.officer
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,6 +15,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -27,6 +30,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -34,19 +40,26 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import uk.co.cabcomply.app.data.db.entity.DocumentEntity
 import uk.co.cabcomply.app.data.db.entity.DocumentOwnerType
 import uk.co.cabcomply.app.data.db.entity.InspectionEntity
 import uk.co.cabcomply.app.data.db.entity.VehicleEntity
+import uk.co.cabcomply.app.data.pdf.ReportDataBuilder
+import uk.co.cabcomply.app.data.pdf.WeeklyReportPdfGenerator
 import uk.co.cabcomply.app.data.repository.DocumentExpiryStatus
 import uk.co.cabcomply.app.data.repository.DocumentRepository
 import uk.co.cabcomply.app.data.repository.InspectionRepository
@@ -59,6 +72,10 @@ import uk.co.cabcomply.app.ui.components.StatusChip
 import uk.co.cabcomply.app.ui.components.StatusTone
 import uk.co.cabcomply.app.util.AppClock
 import uk.co.cabcomply.app.util.DateFormatting
+import uk.co.cabcomply.app.util.PdfPageRenderer
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.temporal.TemporalAdjusters
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
@@ -68,14 +85,23 @@ data class OfficerUiState(
     val documents: List<DocumentEntity> = emptyList()
 )
 
+/** The current week's official-format sheet, rasterised so it renders the instant Officer Mode
+ *  opens - matching what a licensing officer expects to see on paper (product spec sections 38-40). */
+data class OfficerSheetState(
+    val pageBitmaps: List<android.graphics.Bitmap> = emptyList(),
+    val isLoading: Boolean = true
+)
+
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class OfficerViewModel @Inject constructor(
     vehicleRepository: VehicleRepository,
     inspectionRepository: InspectionRepository,
     documentRepository: DocumentRepository,
+    private val reportDataBuilder: ReportDataBuilder,
+    private val pdfGenerator: WeeklyReportPdfGenerator,
     val pinManager: PinManager,
-    clock: AppClock
+    private val clock: AppClock
 ) : ViewModel() {
 
     val nowMillis = clock.nowMillis()
@@ -91,6 +117,27 @@ class OfficerViewModel @Inject constructor(
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), OfficerUiState())
+
+    private val _sheetState = MutableStateFlow(OfficerSheetState())
+    val sheetState: StateFlow<OfficerSheetState> = _sheetState
+
+    init {
+        viewModelScope.launch {
+            vehicleRepository.observeActiveVehicle().map { it?.id }.distinctUntilChanged().collect { vehicleId ->
+                _sheetState.value = OfficerSheetState(isLoading = true)
+                if (vehicleId == null) {
+                    _sheetState.value = OfficerSheetState(isLoading = false)
+                    return@collect
+                }
+                val weekStart = LocalDate.now(clock.zoneId()).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+                val report = reportDataBuilder.buildWeeklyReport(vehicleId, weekStart)
+                val bitmaps = withContext(Dispatchers.IO) {
+                    PdfPageRenderer.renderPages(pdfGenerator.generate(report))
+                }
+                _sheetState.value = OfficerSheetState(pageBitmaps = bitmaps, isLoading = false)
+            }
+        }
+    }
 }
 
 @Composable
@@ -100,6 +147,7 @@ fun OfficerModeScreen(
     viewModel: OfficerViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    val sheetState by viewModel.sheetState.collectAsState()
     var pinChallengeVisible by remember { mutableStateOf(false) }
 
     // The whole point of Officer Mode is that leaving it is deliberately hard (hold 5s, PIN if
@@ -136,13 +184,34 @@ fun OfficerModeScreen(
                 }
             }
             item {
+                Text("This week's compliance sheet", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
+            if (sheetState.isLoading) {
+                item {
+                    Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                }
+            } else {
+                items(sheetState.pageBitmaps) { bitmap ->
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = "This week's compliance sheet",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .shadow(2.dp, RoundedCornerShape(4.dp))
+                            .clip(RoundedCornerShape(4.dp))
+                    )
+                }
+            }
+            item {
                 SectionCard {
                     Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                        Text("Generate weekly report", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text("Browse other weeks", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     }
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        "Produces the same professional PDF used for compliance records.",
+                        "Opens the full weekly report, with paging and share/print.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 8.dp)
