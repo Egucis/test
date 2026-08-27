@@ -54,7 +54,11 @@ import uk.co.cabcomply.app.ui.components.StatusChip
 import uk.co.cabcomply.app.ui.components.StatusTone
 import uk.co.cabcomply.app.util.AppClock
 import uk.co.cabcomply.app.util.DateFormatting
+import uk.co.cabcomply.app.util.HmrcMileageRates
 import uk.co.cabcomply.app.util.UkTaxYear
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import javax.inject.Inject
 
 data class MileageUiState(
@@ -62,19 +66,54 @@ data class MileageUiState(
     val entries: List<MileageEntryEntity> = emptyList(),
     val flagged: List<MileageEntryEntity> = emptyList()
 ) {
+    private val zone = ZoneId.systemDefault()
+
     val currentTaxYearTotal: Int get() {
-        val tax = UkTaxYear.forDate(java.time.LocalDate.now())
+        val tax = UkTaxYear.forDate(LocalDate.now())
         return entries.filter { inTaxYear(it, tax) && it.endMileage != null }.sumOf { it.endMileage!! - it.startMileage }
     }
     val currentTaxYearBusiness: Int get() {
-        val tax = UkTaxYear.forDate(java.time.LocalDate.now())
-        return entries.filter { inTaxYear(it, tax) && it.endMileage != null && it.purpose == MileagePurpose.BUSINESS }
-            .sumOf { it.endMileage!! - it.startMileage }
+        val tax = UkTaxYear.forDate(LocalDate.now())
+        return businessEntriesChronological(tax).sumOf { it.endMileage!! - it.startMileage }
     }
-    private fun inTaxYear(entry: MileageEntryEntity, tax: UkTaxYear): Boolean {
-        val zone = java.time.ZoneId.systemDefault()
-        return entry.entryDate >= tax.startMillis(zone) && entry.entryDate < tax.endMillisExclusive(zone)
+
+    /** HMRC's official 45p/25p-tiered allowance for this tax year's business mileage so far. */
+    val currentTaxYearAllowancePence: Int get() {
+        val tax = UkTaxYear.forDate(LocalDate.now())
+        var cumulativeMiles = 0
+        var totalPence = 0
+        businessEntriesChronological(tax).forEach { entry ->
+            val miles = entry.endMileage!! - entry.startMileage
+            totalPence += HmrcMileageRates.estimateAllowancePence(cumulativeMiles, miles)
+            cumulativeMiles += miles
+        }
+        return totalPence
     }
+
+    /** The individual HMRC allowance for each of today's completed business mileage entries, keyed by entry id. */
+    val todaysAllowanceByEntryId: Map<String, Int> get() {
+        val tax = UkTaxYear.forDate(LocalDate.now())
+        val today = LocalDate.now()
+        var cumulativeMiles = 0
+        val result = mutableMapOf<String, Int>()
+        businessEntriesChronological(tax).forEach { entry ->
+            val miles = entry.endMileage!! - entry.startMileage
+            val pence = HmrcMileageRates.estimateAllowancePence(cumulativeMiles, miles)
+            if (Instant.ofEpochMilli(entry.entryDate).atZone(zone).toLocalDate() == today) {
+                result[entry.id] = pence
+            }
+            cumulativeMiles += miles
+        }
+        return result
+    }
+
+    private fun businessEntriesChronological(tax: UkTaxYear): List<MileageEntryEntity> =
+        entries
+            .filter { inTaxYear(it, tax) && it.endMileage != null && it.purpose == MileagePurpose.BUSINESS }
+            .sortedBy { it.startedAt }
+
+    private fun inTaxYear(entry: MileageEntryEntity, tax: UkTaxYear): Boolean =
+        entry.entryDate >= tax.startMillis(zone) && entry.entryDate < tax.endMillisExclusive(zone)
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -133,6 +172,17 @@ fun MileageScreen(
                         Spacer(Modifier.height(10.dp))
                         Text("Total miles this tax year: ${state.currentTaxYearTotal}", style = MaterialTheme.typography.bodyMedium)
                         Text("Business miles this tax year: ${state.currentTaxYearBusiness}", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "Estimated HMRC allowance: ${HmrcMileageRates.formatPence(state.currentTaxYearAllowancePence)}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Based on HMRC's approved mileage rates: 45p/mile for the first 10,000 business miles, 25p/mile after.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
@@ -172,6 +222,7 @@ fun MileageScreen(
                 }
             } else {
                 items(state.entries, key = { it.id }) { entry ->
+                    val todaysAllowancePence = state.todaysAllowanceByEntryId[entry.id]
                     SectionCard(modifier = Modifier.clickable { onOpenEntry(entry.id) }) {
                         Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                             Column {
@@ -181,6 +232,13 @@ fun MileageScreen(
                                         (entry.endMileage?.let { " (${it - entry.startMileage} miles)" } ?: ""),
                                     style = MaterialTheme.typography.bodyMedium
                                 )
+                                if (todaysAllowancePence != null) {
+                                    Text(
+                                        "HMRC allowance: ${HmrcMileageRates.formatPence(todaysAllowancePence)}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.secondary
+                                    )
+                                }
                             }
                             if (entry.isFlagged) {
                                 StatusChip("Review", StatusTone.WARNING)
