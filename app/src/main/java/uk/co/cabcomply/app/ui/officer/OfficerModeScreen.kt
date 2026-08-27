@@ -1,5 +1,6 @@
 package uk.co.cabcomply.app.ui.officer
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -100,6 +101,10 @@ fun OfficerModeScreen(
 ) {
     val state by viewModel.state.collectAsState()
     var pinChallengeVisible by remember { mutableStateOf(false) }
+
+    // The whole point of Officer Mode is that leaving it is deliberately hard (hold 5s, PIN if
+    // enabled) - the system Back button/gesture must never be a silent bypass of that.
+    BackHandler(enabled = true) {}
 
     Column(Modifier.fillMaxSize()) {
         Surface(color = MaterialTheme.colorScheme.primary) {
