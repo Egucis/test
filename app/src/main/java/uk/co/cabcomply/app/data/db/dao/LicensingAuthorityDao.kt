@@ -25,7 +25,7 @@ interface LicensingAuthorityDao {
     @Query("DELETE FROM licensing_authorities")
     suspend fun deleteAll()
 
-    @Insert(onConflictStrategy = OnConflictStrategy.IGNORE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(authorities: List<LicensingAuthorityEntity>)
 
     @Upsert

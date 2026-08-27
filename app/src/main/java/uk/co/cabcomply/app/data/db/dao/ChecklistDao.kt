@@ -14,10 +14,10 @@ interface ChecklistDao {
     @Query("SELECT COUNT(*) FROM checklists")
     suspend fun count(): Int
 
-    @Insert(onConflictStrategy = OnConflictStrategy.IGNORE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertChecklists(checklists: List<ChecklistEntity>)
 
-    @Insert(onConflictStrategy = OnConflictStrategy.IGNORE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertItems(items: List<ChecklistItemEntity>)
 
     @Upsert

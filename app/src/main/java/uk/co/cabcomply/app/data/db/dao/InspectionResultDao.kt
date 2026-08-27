@@ -9,7 +9,7 @@ import uk.co.cabcomply.app.data.db.entity.InspectionResultEntity
 
 @Dao
 interface InspectionResultDao {
-    @Insert(onConflictStrategy = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(results: List<InspectionResultEntity>)
 
     @Query("SELECT * FROM inspection_results WHERE inspectionId = :inspectionId ORDER BY displayOrderSnapshot ASC")

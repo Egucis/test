@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -126,7 +127,7 @@ fun HistoryScreen(onOpenInspection: (String) -> Unit, viewModel: HistoryViewMode
                     readOnly = true,
                     label = { Text("Vehicle") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = vehicleMenuExpanded) },
-                    modifier = Modifier.menuAnchor()
+                    modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
                 )
                 androidx.compose.material3.ExposedDropdownMenu(expanded = vehicleMenuExpanded, onDismissRequest = { vehicleMenuExpanded = false }) {
                     DropdownMenuItem(text = { Text("All vehicles") }, onClick = { viewModel.selectVehicle(null); vehicleMenuExpanded = false })
@@ -145,7 +146,7 @@ fun HistoryScreen(onOpenInspection: (String) -> Unit, viewModel: HistoryViewMode
                     readOnly = true,
                     label = { Text("Range") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = rangeMenuExpanded) },
-                    modifier = Modifier.menuAnchor()
+                    modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
                 )
                 androidx.compose.material3.ExposedDropdownMenu(expanded = rangeMenuExpanded, onDismissRequest = { rangeMenuExpanded = false }) {
                     HistoryRangeFilter.entries.forEach { r ->

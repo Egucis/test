@@ -10,7 +10,7 @@ import uk.co.cabcomply.app.data.db.entity.AttachmentOwnerType
 
 @Dao
 interface AttachmentDao {
-    @Insert(onConflictStrategy = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(attachments: List<AttachmentEntity>)
 
     @Query("SELECT * FROM attachments WHERE ownerType = :ownerType AND ownerId = :ownerId ORDER BY createdAt ASC")

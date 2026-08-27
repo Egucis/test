@@ -11,7 +11,7 @@ import uk.co.cabcomply.app.data.db.entity.DefectStatus
 
 @Dao
 interface DefectDao {
-    @Insert(onConflictStrategy = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(defects: List<DefectEntity>)
 
     @Upsert
