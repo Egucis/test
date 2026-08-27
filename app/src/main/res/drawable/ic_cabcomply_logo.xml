@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="216dp"
+    android:height="216dp"
+    android:viewportWidth="216"
+    android:viewportHeight="216">
+    <!-- CabComply logo: rounded badge, shield + check. Used in-app, in PDFs and as the notification icon source. -->
+    <path
+        android:fillColor="@color/brand_blue"
+        android:pathData="M32,0 L184,0 C201.67,0 216,14.33 216,32 L216,184 C216,201.67 201.67,216 184,216 L32,216 C14.33,216 0,201.67 0,184 L0,32 C0,14.33 14.33,0 32,0 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M108,50 L154,70 L154,114 C154,146 130,166 108,178 C86,166 62,146 62,114 L62,70 Z" />
+    <path
+        android:fillColor="@color/brand_blue"
+        android:pathData="M88,116 L100,128 L130,94 L138,102 L102,140 L80,124 Z" />
+</vector>

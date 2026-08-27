@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- CabComply brand palette: deep trust-blue + safety-green accent, kept deliberately small -->
+    <color name="brand_blue">#0B4F6C</color>
+    <color name="brand_blue_dark">#062E3D</color>
+    <color name="brand_blue_light">#E7F1F5</color>
+    <color name="brand_green">#1E8E5A</color>
+    <color name="brand_amber">#C77700</color>
+    <color name="brand_red">#B3261E</color>
+    <color name="brand_surface">#FFFFFF</color>
+    <color name="brand_background">#F5F7F8</color>
+    <color name="brand_ink">#16232B</color>
+    <color name="brand_ink_muted">#5B6B73</color>
+    <color name="icon_background">#0B4F6C</color>
+</resources>

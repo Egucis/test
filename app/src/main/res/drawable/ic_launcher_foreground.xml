@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Simple shield badge, deliberately free of fine detail so it reads at launcher size -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,25 L77,35 L77,57 C77,73 65,83 54,89 C43,83 31,73 31,57 L31,35 Z" />
+    <path
+        android:fillColor="@color/brand_blue"
+        android:pathData="M44,58 L50,64 L65,47 L69,51 L51,70 L40,61 Z" />
+</vector>
