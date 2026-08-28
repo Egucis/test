@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Overlay colours live in resources rather than in the Compose theme because the floating window
+  is built from plain Android views (see overlay/OverlayController.kt for why).
+-->
+<resources>
+    <color name="overlay_ink">#FFFFFFFF</color>
+    <color name="overlay_ink_muted">#FFC7D2D8</color>
+    <color name="overlay_scrim">#F21B242A</color>
+    <color name="status_good">#FF1E8E5A</color>
+    <color name="status_borderline">#FFC77700</color>
+    <color name="status_poor">#FFD1483E</color>
+    <color name="status_unknown">#FF8C9BA3</color>
+    <color name="brand_green">#FF1B7F5A</color>
+    <color name="brand_ink">#FF16232B</color>
+    <color name="white">#FFFFFFFF</color>
+</resources>

@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The floating recommendation (spec sections 24 to 27).
+
+  Built from plain views rather than Compose: this window lives outside any Activity, is recreated
+  on rotation and must redraw in a few milliseconds while OCR is running on the same device. Plain
+  views keep it cheap and predictable. Status is never colour alone — the dot is always paired with
+  a word (GOOD / BORDERLINE / POOR / CAN'T READ), per spec sections 25 and 46.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/overlayRoot"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:gravity="end">
+
+    <LinearLayout
+        android:id="@+id/collapsedPill"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/overlay_pill_background"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="14dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp">
+
+        <View
+            android:id="@+id/statusDot"
+            android:layout_width="12dp"
+            android:layout_height="12dp"
+            android:layout_marginEnd="10dp"
+            android:background="@drawable/overlay_status_dot" />
+
+        <TextView
+            android:id="@+id/statusLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="10dp"
+            android:textColor="@color/overlay_ink"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:text="@string/overlay_waiting" />
+
+        <TextView
+            android:id="@+id/statusMetrics"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/overlay_ink"
+            android:textSize="16sp"
+            android:maxLines="1"
+            android:text="" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/expandedCard"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:minWidth="240dp"
+        android:background="@drawable/overlay_card_background"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:padding="16dp">
+
+        <TextView
+            android:id="@+id/expandedTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/overlay_ink"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:text="" />
+
+        <TextView
+            android:id="@+id/expandedReason"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="10dp"
+            android:textColor="@color/overlay_ink_muted"
+            android:textSize="14sp"
+            android:text="" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="@color/overlay_ink_muted"
+                android:textSize="14sp"
+                android:text="@string/overlay_row_fare" />
+
+            <TextView
+                android:id="@+id/valueFare"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/overlay_ink"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:text="" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="@color/overlay_ink_muted"
+                android:textSize="14sp"
+                android:text="@string/overlay_row_per_mile" />
+
+            <TextView
+                android:id="@+id/valuePerMile"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/overlay_ink"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:text="" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="@color/overlay_ink_muted"
+                android:textSize="14sp"
+                android:text="@string/overlay_row_per_hour" />
+
+            <TextView
+                android:id="@+id/valuePerHour"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/overlay_ink"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:text="" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="@color/overlay_ink_muted"
+                android:textSize="14sp"
+                android:text="@string/overlay_row_pickup" />
+
+            <TextView
+                android:id="@+id/valuePickup"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/overlay_ink"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:text="" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="@color/overlay_ink_muted"
+                android:textSize="14sp"
+                android:text="@string/overlay_row_trip" />
+
+            <TextView
+                android:id="@+id/valueTrip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/overlay_ink"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:text="" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="@color/overlay_ink_muted"
+                android:textSize="14sp"
+                android:text="@string/overlay_row_rider" />
+
+            <TextView
+                android:id="@+id/valueRider"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/overlay_ink"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:text="" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/valueProfile"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:textColor="@color/overlay_ink_muted"
+            android:textSize="13sp"
+            android:text="" />
+    </LinearLayout>
+</LinearLayout>

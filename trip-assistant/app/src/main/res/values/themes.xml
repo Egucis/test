@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Compose supplies the real theming; this exists so the window background and the launch
+         screen do not flash the platform default. -->
+    <style name="Theme.TripAssistant" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowBackground">#FFF5F7F8</item>
+        <item name="android:statusBarColor">#FFF5F7F8</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>

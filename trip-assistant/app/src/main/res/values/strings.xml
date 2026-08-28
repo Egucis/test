@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Trip Assistant</string>
+
+    <!-- Notification (spec section 9: Android requires a persistent notice while capturing). -->
+    <string name="notification_channel_name">Assistant status</string>
+    <string name="notification_channel_description">Shown while the assistant is reading the Uber screen.</string>
+    <string name="notification_title">Trip Assistant is running</string>
+    <string name="notification_text">Reading trip offers on this device. Nothing is uploaded.</string>
+    <string name="notification_stop">Stop</string>
+
+    <!-- Overlay (spec sections 25 and 26). -->
+    <string name="overlay_waiting">WAITING</string>
+    <string name="overlay_good">GOOD</string>
+    <string name="overlay_borderline">BORDERLINE</string>
+    <string name="overlay_poor">POOR</string>
+    <string name="overlay_unknown">CAN\'T READ</string>
+    <string name="overlay_good_title">GOOD TRIP</string>
+    <string name="overlay_borderline_title">BORDERLINE TRIP</string>
+    <string name="overlay_poor_title">POOR TRIP</string>
+    <string name="overlay_unknown_title">CAN\'T READ OFFER</string>
+    <string name="overlay_row_fare">Fare</string>
+    <string name="overlay_row_per_mile">£ / mile</string>
+    <string name="overlay_row_per_hour">£ / hour</string>
+    <string name="overlay_row_pickup">Pickup</string>
+    <string name="overlay_row_trip">Trip</string>
+    <string name="overlay_row_rider">Rider</string>
+    <string name="overlay_waiting_detail">Waiting for an offer</string>
+</resources>

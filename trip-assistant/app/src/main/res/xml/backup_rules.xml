@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Settings, rule profiles and offer history are ordinary local data and may be backed up. The
+  entitlement cache is excluded on purpose: a restored copy of "subscription confirmed" would be a
+  stale claim about a purchase, and entitlement is re-verified against Google Play instead
+  (spec sections 5 and 42).
+-->
+<full-backup-content>
+    <include domain="database" path="trip_assistant.db" />
+    <include domain="sharedpref" path="." />
+    <exclude domain="file" path="datastore/entitlement.preferences_pb" />
+</full-backup-content>

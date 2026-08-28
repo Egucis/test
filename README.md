@@ -13,6 +13,13 @@ CabComply is an independent record-keeping tool. It is not a council or governme
 application, is not officially approved by any licensing authority, and does not itself
 guarantee legal or licensing compliance.
 
+## Also in this repository
+
+`trip-assistant/` is a separate product built to its own specification: **Trip Decision
+Assistant**, a rideshare offer evaluator that reads a trip offer from the screen and says whether
+it is worth taking. It shares CabComply's design language but is an independent app with its own
+Gradle build, package name and branding. See `trip-assistant/README.md`.
+
 ## Project structure
 
 ```
