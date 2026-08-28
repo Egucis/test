@@ -5,7 +5,6 @@ import android.content.Context
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
-import android.provider.Settings
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -14,6 +13,7 @@ import android.view.ViewConfiguration
 import android.view.WindowManager
 import androidx.core.content.ContextCompat
 import uk.co.tripassistant.app.R
+import uk.co.tripassistant.app.util.OverlayPermission
 import uk.co.tripassistant.app.databinding.OverlayAssistantBinding
 import uk.co.tripassistant.core.model.Recommendation
 import uk.co.tripassistant.core.text.Rect01
@@ -48,8 +48,7 @@ class OverlayController(
 
     val isAttached: Boolean get() = binding != null
 
-    fun canDraw(): Boolean =
-        Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(context)
+    fun canDraw(): Boolean = OverlayPermission.isGranted(context)
 
     @SuppressLint("ClickableViewAccessibility")
     fun attach(savedX: Int?, savedY: Int?, compact: Boolean, preferRightSide: Boolean) {

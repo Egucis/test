@@ -3,7 +3,6 @@ package uk.co.tripassistant.app.ui.home
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
-import android.provider.Settings
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -27,6 +26,7 @@ import uk.co.tripassistant.app.service.AssistantStateHolder
 import uk.co.tripassistant.app.service.AssistantStatus
 import uk.co.tripassistant.app.service.AssistantStoppedReason
 import uk.co.tripassistant.app.util.DayRange
+import uk.co.tripassistant.app.util.OverlayPermission
 import uk.co.tripassistant.app.util.UberDriverLauncher
 import uk.co.tripassistant.core.entitlement.AccessDecision
 import uk.co.tripassistant.core.entitlement.AccessLevel
@@ -49,7 +49,8 @@ enum class StartBlocker(val title: String, val detail: String, val action: Strin
     ),
     OVERLAY_PERMISSION(
         title = "Display over other apps",
-        detail = "The recommendation is shown in a small floating window above Uber Driver.",
+        detail = "The recommendation is shown in a small floating window above Uber Driver.\n\n" +
+            OverlayPermission.RESTRICTED_SETTINGS_HINT,
         action = "Allow"
     ),
     NOTIFICATION_PERMISSION(
@@ -142,12 +143,9 @@ class HomeViewModel @Inject constructor(
             if (appSettings.privacyAckVersion < AppSettings.CURRENT_PRIVACY_VERSION) {
                 add(StartBlocker.PRIVACY_ACKNOWLEDGEMENT)
             }
-            if (!canDrawOverlay()) add(StartBlocker.OVERLAY_PERMISSION)
+            if (!OverlayPermission.isGranted(context)) add(StartBlocker.OVERLAY_PERMISSION)
             if (!notificationsGranted()) add(StartBlocker.NOTIFICATION_PERMISSION)
         }
-
-    private fun canDrawOverlay(): Boolean =
-        Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(context)
 
     /**
      * The capture notification is not optional — Android shows it while a projection runs — so a

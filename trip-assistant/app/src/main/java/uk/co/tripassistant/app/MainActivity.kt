@@ -1,9 +1,9 @@
 package uk.co.tripassistant.app
 
-import android.content.Intent
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -28,6 +28,7 @@ import uk.co.tripassistant.app.ui.navigation.AppRootViewModel
 import uk.co.tripassistant.app.ui.navigation.Destinations
 import uk.co.tripassistant.app.ui.navigation.TripAssistantNavGraph
 import uk.co.tripassistant.app.ui.theme.TripAssistantTheme
+import uk.co.tripassistant.app.util.OverlayPermission
 
 /**
  * The app's single Activity.
@@ -102,13 +103,13 @@ class MainActivity : ComponentActivity() {
                             }
                         },
                         onOpenOverlaySettings = {
-                            runCatching {
-                                context.startActivity(
-                                    Intent(
-                                        android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                        android.net.Uri.parse("package:${context.packageName}")
-                                    )
-                                )
+                            if (!OverlayPermission.openSettings(context)) {
+                                Toast.makeText(
+                                    context,
+                                    "Could not open Android's settings. Find Trip Assistant under " +
+                                        "Settings › Apps › Special app access › Display over other apps.",
+                                    Toast.LENGTH_LONG
+                                ).show()
                             }
                         }
                     )
