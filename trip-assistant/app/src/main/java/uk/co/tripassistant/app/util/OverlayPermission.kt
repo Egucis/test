@@ -29,9 +29,11 @@ object OverlayPermission {
      * like a broken app, and the real cause is two menus away.
      */
     const val RESTRICTED_SETTINGS_HINT =
-        "If the switch is greyed out, Android has locked it because the app was installed " +
-            "outside the Play Store. Open Settings › Apps › Trip Assistant, tap ⋮ in the top " +
-            "corner, choose \"Allow restricted settings\", then come back."
+        "If Android says \"App was denied access\", it has locked this permission because the app " +
+            "was installed outside the Play Store — not because anything is wrong with it.\n\n" +
+            "To unlock it, go to Settings › Apps › Trip Assistant — the app's own info page, not " +
+            "the permission screen — tap ⋮ in the top corner and choose \"Allow restricted " +
+            "settings\". Then come back and turn the switch on."
 
     fun isGranted(context: Context): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(context)
