@@ -204,15 +204,29 @@ Localisation would mean moving `Formats` and `ReasonBuilder` output behind a str
 interface; the overlay's own status words (GOOD / BORDERLINE / POOR / CAN'T READ) are already in
 `strings.xml`.
 
-### D5. Play Billing 9.1.0 is pinned but could not be compiled against
+### D5. Play Billing 9.1.0 dictates the Kotlin version
 
 Spec section 4 names 9.1.0 as the current library, and Play requires a recent one for new releases,
-so that is what `app/build.gradle.kts` pins. This environment has no access to Google's Maven
-repository, so `PlayBillingDataSource.kt` could not be compiled against the real SDK.
+so that is what `app/build.gradle.kts` pins. That choice is not free: billing 9.1.0 is compiled with
+Kotlin 2.2.10 and brings that stdlib with it, and a Kotlin 2.0.x compiler cannot read 2.2 metadata —
+the build fails in `kspDebugKotlin` with "module was compiled with an incompatible version of
+Kotlin". The first real build hit exactly this.
 
-That file is deliberately the **only** file in the project that imports the Play SDK, and it sits
-behind the `BillingDataSource` interface. If the library's surface differs from what is written
-there, it is a single-file fix and nothing else changes.
+The rest of the toolchain follows from that one constraint:
+
+| | | |
+|---|---|---|
+| Kotlin | 2.2.10 | the stdlib Play Billing 9.1.0 ships |
+| KSP | 2.2.10-2.0.2 | the KSP2 build for that Kotlin — no KSP1 build exists for 2.2.x |
+| Hilt | 2.57.2 | its processor targets KSP API **2.0.2**, the same generation. 2.51.1 targets KSP 1.0.x and cannot work with Kotlin 2.2 |
+| Room | 2.7.2 | 2.6.x predates KSP2 |
+| AGP | 8.7.3 | supports compileSdk 35 without the warning 8.5.2 emits |
+
+Only the Kotlin, KSP and Hilt versions could be verified from this environment (Maven Central is
+reachable, Google's Maven is not). The Room, AGP and Compose BOM pins are chosen but unverified.
+
+`PlayBillingDataSource.kt` is still the **only** file that imports the Play SDK, behind the
+`BillingDataSource` interface, so a difference in its surface is a single-file fix.
 
 ### D6. compileSdk / targetSdk 35 with AGP 8.5.2
 
@@ -228,6 +242,31 @@ resolution. Offer text is large, and a shift-long capture at 1440p is a battery 
 (spec section 53). Parsers work in normalised 0..1 coordinates, so nothing downstream is affected.
 
 ---
+
+## D8. The parsers are now written against real cards, not assumptions
+
+The first version of `core/parser` was written without ever having seen an Uber offer card. Real
+UK cards were supplied afterwards and the leg format turned out to be right —
+`12 mins (4.3 mi) away` / `10 mins (4.0 mi) trip` — but four things were wrong or fragile, and each
+is now a named test in `RealWorldCardTest.kt`:
+
+1. **The holiday-pay breakdown.** UK cards show `£8.85 + est. holiday pay of £0.19` under the
+   headline fare. Both amounts were fare candidates; only text prominence kept the right one
+   winning. "holiday pay" and "est." are now fare-exclusion keywords.
+2. **A rating-shaped fare.** `£4.62` matches the shape of a rating exactly, so a cheap trip could
+   report a rider rating that was never on screen. Rating detection now skips any line carrying
+   money or a unit.
+3. **A lost star glyph.** Rating detection required `★`, which ML Kit's Latin recogniser has no
+   obligation to return. A mangled glyph meant PARTIAL confidence, which caps at BORDERLINE — so
+   every offer would have looked borderline and the product would have seemed broken. A
+   rating-shaped number alone on its line is now a confident read whatever decorates it.
+4. **The accepted screen.** Accepting replaces the "Confirm" card with the *same card* under a
+   "Matched" heading and a "Let's go" button. Outcome detection only ran on screens that did not
+   parse as an offer, so an accepted trip was never recorded as accepted. The signal is now checked
+   before parsing, and both phrases are evidence (spec section 30).
+
+Still unseen, and therefore still guesses: Reserve/scheduled offers, multi-stop trips, a stacked
+offer arriving mid-trip, surge and guarantee wording, and non-UK layouts.
 
 ## E. In the specification, not in this repository
 

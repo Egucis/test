@@ -66,6 +66,13 @@ class LiveOfferPipeline @Inject constructor(
      * @return what the overlay should show, or null to leave it as it is.
      */
     suspend fun analyse(text: OcrText, overlayBounds: Rect01?, now: Long): OverlayState? {
+        // Acceptance is checked before anything else. On the current UK flow the accepted screen
+        // shows the *same* card under a "Matched" heading, so it still parses as an offer — if
+        // this only ran on non-offer screens the outcome would never be recorded (spec section 30).
+        if (OutcomeDetector.signal(text) == PostOfferSignal.TRIP_ACCEPTED) {
+            markRecentOfferAccepted(now)
+        }
+
         val result = analyzer.analyze(
             text = text,
             profile = activeProfile,
@@ -74,7 +81,7 @@ class LiveOfferPipeline @Inject constructor(
         state.onAnalysis(result.evaluation, result.diagnostics)
 
         val evaluation = result.evaluation
-            ?: return handleNonOfferScreen(text, now)
+            ?: return handleNonOfferScreen(now)
 
         lastEvaluationAt = now
         recordAndAlert(evaluation, now)
@@ -82,18 +89,18 @@ class LiveOfferPipeline @Inject constructor(
     }
 
     /**
-     * The screen is not an offer. Two things can be true: the offer was accepted (and the next
-     * screen says so), or there is simply nothing to show yet.
+     * Marks the offer recorded a moment ago as accepted. Never called without evidence, and there
+     * is no equivalent for "declined" — an offer disappearing proves nothing (spec section 30).
      */
-    private suspend fun handleNonOfferScreen(text: OcrText, now: Long): OverlayState? {
-        if (OutcomeDetector.signal(text) == PostOfferSignal.TRIP_ACCEPTED) {
-            val id = lastRecordedOfferId
-            if (id != null && now - lastRecordedAt <= OUTCOME_WINDOW_MILLIS) {
-                history.markOutcome(id, OfferOutcome.ACCEPTED)
-                lastRecordedOfferId = null
-            }
-        }
+    private suspend fun markRecentOfferAccepted(now: Long) {
+        val id = lastRecordedOfferId ?: return
+        if (now - lastRecordedAt > OUTCOME_WINDOW_MILLIS) return
+        history.markOutcome(id, OfferOutcome.ACCEPTED)
+        lastRecordedOfferId = null
+    }
 
+    /** The screen is not an offer, so there is nothing new to show. */
+    private fun handleNonOfferScreen(now: Long): OverlayState? {
         // Hold the last recommendation briefly: an offer card redraws, and a flicker back to
         // "waiting" between frames would be worse than useless while driving.
         if (now - lastEvaluationAt < RESULT_HOLD_MILLIS) return null

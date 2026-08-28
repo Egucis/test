@@ -28,6 +28,14 @@ object OutcomeDetector {
      * or "navigate" on their own are far too common to mean anything.
      */
     private val ACCEPTED_PHRASES = listOf(
+        // Current UK flow: accepting an offer replaces the "Confirm" card with the same card
+        // under a "Matched" heading and a "Let's go" button. Neither wording appears on an offer
+        // that is still open, so seeing them is real evidence the trip was taken.
+        "matched",
+        "let's go",
+        "lets go",
+
+        // In-trip screens.
         "cancel trip",
         "start trip",
         "begin trip",

@@ -11,6 +11,11 @@ import uk.co.tripassistant.core.parser.ScreenType
  * themselves are not committed: they would carry rider information, and the parser never sees a
  * pixel anyway (see SPEC_COMPLIANCE.md).
  *
+ * Samples prefixed UK_2026_ are transcribed from real UK Uber Driver cards. Fares, distances,
+ * times and ratings are exactly as they appeared; pickup and destination addresses have been
+ * replaced with structurally identical fictional ones, because those are the one thing this
+ * product deliberately never keeps (spec section 40).
+ *
  * When Uber changes its interface, ADD a sample. Never edit an existing one: the old layout is
  * still on thousands of phones, and a sample that quietly changes stops being a regression test.
  */
@@ -210,6 +215,86 @@ object ParserSamples {
             expectedTripMiles = 3.1,
             expectedTripMinutes = 11.0,
             expectedRating = 4.80
+        ),
+        // --- transcribed from real UK cards, August 2026 -----------------------------------
+        ParserSample(
+            id = "UK_2026_UBERX_EXCLUSIVE_LONG_PICKUP",
+            description = "Real UK card: 4.3 mi unpaid pickup for a 4.0 mi trip, holiday-pay breakdown line",
+            lines = listOf(
+                "UberX",
+                "Exclusive",
+                "£9.04",
+                "★ 4.88",
+                "£8.85 + est. holiday pay of £0.19",
+                "12 mins (4.3 mi) away",
+                "Anytown CV00 0AA, UK",
+                "10 mins (4.0 mi) trip",
+                "1 Example Street, Anytown, Anytown, Exampleshire, England, CV00 0BB",
+                "1 mi from fast charger",
+                "Confirm"
+            ),
+            expectedScreenType = ScreenType.OFFER,
+            expectedParser = "UBER_UK_STANDARD_V1",
+            expectedFare = 9.04,
+            expectedPickupMiles = 4.3,
+            expectedPickupMinutes = 12.0,
+            expectedTripMiles = 4.0,
+            expectedTripMinutes = 10.0,
+            expectedRating = 4.88
+        ),
+        ParserSample(
+            id = "UK_2026_UBERX_EXCLUSIVE_SHORT_PICKUP",
+            description = "Real UK card: close pickup, a 5.00 rating, holiday-pay breakdown line",
+            lines = listOf(
+                "UberX",
+                "Exclusive",
+                "£6.76",
+                "★ 5.00",
+                "£6.30 + est. holiday pay of £0.46",
+                "3 mins (0.5 mi) away",
+                "Example Ter, Anytown, Exampleshire, CV00 0CC, GB",
+                "14 mins (5.0 mi) trip",
+                "Example Rd, Otherplace, Anytown CV00 0DD, UK",
+                "1 mi from fast charger",
+                "Confirm"
+            ),
+            expectedScreenType = ScreenType.OFFER,
+            expectedParser = "UBER_UK_STANDARD_V1",
+            expectedFare = 6.76,
+            expectedPickupMiles = 0.5,
+            expectedPickupMinutes = 3.0,
+            expectedTripMiles = 5.0,
+            expectedTripMinutes = 14.0,
+            expectedRating = 5.00
+        ),
+        ParserSample(
+            id = "UK_2026_UBERX_MATCHED",
+            description = "Real UK screen after accepting: the same card under Matched / Let's go, over live navigation",
+            lines = listOf(
+                "Example Lane",
+                "150 ft",
+                "Example Place",
+                "1-3 Example Rd, Anytown",
+                "Matched",
+                "UberX",
+                "£5.08",
+                "★ 4.62",
+                "£4.82 + est. holiday pay of £0.26",
+                "5 mins (1.7 mi) away",
+                "Example Place, 1-3 Example Rd, Anytown CV00 0AA, UK",
+                "7 mins (2.3 mi) trip",
+                "1 Example Road, Anytown, Anytown, Exampleshire, England, CV00 0BB",
+                "1 mi from fast charger",
+                "Let's go"
+            ),
+            expectedScreenType = ScreenType.OFFER,
+            expectedParser = "UBER_UK_STANDARD_V1",
+            expectedFare = 5.08,
+            expectedPickupMiles = 1.7,
+            expectedPickupMinutes = 5.0,
+            expectedTripMiles = 2.3,
+            expectedTripMinutes = 7.0,
+            expectedRating = 4.62
         ),
         ParserSample(
             id = "NOT_OFFER_WAITING",

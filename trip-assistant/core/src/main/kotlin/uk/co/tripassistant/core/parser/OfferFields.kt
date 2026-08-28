@@ -100,17 +100,29 @@ internal object OfferFields {
     /**
      * The rider rating (spec section 14).
      *
-     * Contextual matching matters here more than anywhere else: spec section 16 specifically calls
-     * out that a rating must never be mistaken for mileage. A number only becomes a rating if it
-     * sits on a line of its own, or next to a star, or on a line carrying no units at all.
+     * Contextual matching matters here more than anywhere else. Spec section 16 calls out that a
+     * rating must never be mistaken for mileage; real cards showed the opposite risk too, since a
+     * fare of "£4.62" is exactly rating-shaped. So:
+     *
+     *  * any line carrying a currency symbol or a unit is skipped outright — a fare is never a
+     *    rating, and neither is a distance;
+     *  * a rating-shaped number sitting alone on its line is taken as the rating, whatever
+     *    decoration OCR made of the star beside it;
+     *  * a number next to a recognised star is taken as the rating;
+     *  * a rating-shaped number buried in a line of other words, with no star and no units, is
+     *    accepted but recorded as an assumption, which caps the offer at BORDERLINE.
      */
     fun findRating(text: OcrText): FieldResult<Double> {
         var weak: Pair<Double, TextLine>? = null
 
         for (line in text.readingOrder()) {
             val body = line.text.trim()
+            // The rating line carries no money and no units. That single rule is what separates it
+            // from a fare ("£4.62") and from a distance ("2.0 mi") — both of which are otherwise
+            // shaped exactly like a rating.
+            if (hasUnitToken(body)) continue
 
-            Patterns.RATING_ONLY_LINE.find(body)?.let { match ->
+            Patterns.RATING_STANDALONE_LINE.find(body)?.let { match ->
                 val value = ratingValue(match.groupValues[1]) ?: return@let
                 return FieldResult(value, emptySet())
             }
@@ -122,7 +134,7 @@ internal object OfferFields {
                 }
             }
 
-            if (weak == null && !hasUnitToken(body)) {
+            if (weak == null) {
                 Patterns.RATING_INLINE.find(body)?.let { match ->
                     val value = ratingValue(match.groupValues[1]) ?: return@let
                     weak = value to line
@@ -137,8 +149,9 @@ internal object OfferFields {
     private fun ratingValue(token: String): Double? =
         token.replace(',', '.').toDoubleOrNull()?.takeIf { it in 1.0..5.0 }
 
+    /** True when the line carries money, a distance, a duration or a percentage. */
     private fun hasUnitToken(line: String): Boolean =
-        line.contains('£') ||
+        Patterns.containsCurrency(line) ||
             Patterns.DISTANCE.containsMatchIn(line) ||
             Patterns.DURATION.containsMatchIn(line) ||
             line.contains('%')

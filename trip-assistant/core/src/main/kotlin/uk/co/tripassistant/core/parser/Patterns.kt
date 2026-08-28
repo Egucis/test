@@ -29,8 +29,14 @@ internal object Patterns {
         RegexOption.IGNORE_CASE
     )
 
-    /** A line that is nothing but a rating, with or without a star: "4.91", "★ 4.91". */
-    val RATING_ONLY_LINE = Regex("^[★☆⭐✩*\\s]*([1-5][.,]\\d{1,2})[★☆⭐✩*\\s]*$")
+    /**
+     * A line that is nothing but a rating, allowing a few characters of decoration either side:
+     * "4.91", "★ 4.91", "* 4.91" — and, importantly, whatever OCR makes of a star glyph it does
+     * not recognise. Uber puts the rating on a line of its own, so a rating-shaped number sitting
+     * alone is the rating; being strict about the star meant a mis-read glyph downgraded every
+     * offer to "partly read".
+     */
+    val RATING_STANDALONE_LINE = Regex("^[^0-9]{0,3}([1-5][.,]\\d{1,2})[^0-9]{0,3}$")
 
     val RATING_INLINE = Regex("\\b([1-5][.,]\\d{1,2})\\b")
 
@@ -44,6 +50,9 @@ internal object Patterns {
 
     /** Amounts sitting next to these words are not the offered fare. */
     val FARE_EXCLUSION_KEYWORDS = listOf(
+        // UK cards show a breakdown line under the fare: "£8.85 + est. holiday pay of £0.19".
+        // Both amounts on it are components of the headline fare, not the fare itself.
+        "holiday pay", "est.",
         "bonus", "promo", "promotion", "tip", "boost", "surge", "quest", "incentive",
         "per hour", "/hr", "/h", "per mile", "/mi", "extra", "included", "includes",
         "total earnings", "today", "week", "balance"
@@ -51,7 +60,10 @@ internal object Patterns {
 
     /** Words that make a screen look like a trip offer. */
     val OFFER_KEYWORDS = listOf(
-        "accept", "match", "away", "trip", "uberx", "uber x", "comfort", "uber green", "green",
+        // "confirm" and "let's go" are the buttons on current UK cards; "accept" is kept for
+        // older layouts and other markets.
+        "accept", "confirm", "let's go", "lets go", "match", "away", "trip",
+        "uberx", "uber x", "comfort", "uber green", "green",
         "xl", "exclusive", "pet", "assist", "share", "reserve", "delivery", "premier",
         "verified", "surge", "guaranteed", "rider", "passenger"
     )
@@ -62,6 +74,10 @@ internal object Patterns {
         "you are offline", "go online", "earnings", "wallet", "account", "settings", "inbox",
         "opportunities", "vehicle", "help", "safety toolkit"
     )
+
+    /** A line carrying money is never a rating — "£4.62" must not become a 4.62 rating. */
+    fun containsCurrency(line: String): Boolean =
+        line.any { it == '£' || it == '$' || it == '\u20AC' }
 
     fun containsAny(haystack: String, needles: List<String>): Boolean =
         needles.any { haystack.contains(it, ignoreCase = true) }
