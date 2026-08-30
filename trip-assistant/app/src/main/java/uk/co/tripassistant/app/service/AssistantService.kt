@@ -150,6 +150,11 @@ class AssistantService : LifecycleService() {
             return
         }
 
+        // A second Start while a session is already live must replace it, never stack on it —
+        // otherwise the previous capture, projection and overlay all leak and the driver ends up
+        // with two floating windows.
+        teardownSession()
+
         currentSettings = settings.current()
         pipeline.reset()
         pipeline.activeProfile = profiles.activeProfile()
@@ -180,6 +185,10 @@ class AssistantService : LifecycleService() {
     }
 
     private fun attachOverlay() {
+        // Never leave a previous window attached; two overlays is worse than none.
+        overlay?.detach()
+        overlay = null
+
         val controller = OverlayController(overlayContext) { x, y ->
             lifecycleScope.launch { settings.setOverlayPosition(x, y) }
         }
@@ -239,10 +248,9 @@ class AssistantService : LifecycleService() {
                 val sizeChanged = updated.overlaySize != currentSettings.overlaySize
                 currentSettings = updated
                 if (sizeChanged) {
-                    withContext(Dispatchers.Main) {
-                        overlay?.detach()
-                        attachOverlay()
-                    }
+                    // attachOverlay detaches whatever is there first, so a size change swaps the
+                    // window rather than adding one.
+                    withContext(Dispatchers.Main) { attachOverlay() }
                 }
             }
         }
@@ -274,7 +282,15 @@ class AssistantService : LifecycleService() {
         mainHandler.post { overlay?.clampIntoScreen() }
     }
 
-    private fun stopEverything(reason: AssistantStoppedReason) {
+    /**
+     * Releases everything this session owns. Idempotent, and safe to call from any thread.
+     *
+     * The overlay reference is taken *before* the field is cleared. Doing it the other way round —
+     * clearing the field and posting `overlay?.detach()` — means the posted lambda finds null and
+     * the window is never removed from the WindowManager, so it sits on top of every app until the
+     * process dies, and the next start puts a second one on top of it.
+     */
+    private fun teardownSession() {
         analysisJob?.cancel()
         analysisJob = null
         entitlementJob?.cancel()
@@ -289,9 +305,21 @@ class AssistantService : LifecycleService() {
         }
         projection = null
 
-        mainHandler.post { overlay?.detach() }
+        val controller = overlay
         overlay = null
+        if (controller != null) {
+            // Window operations must happen on the main thread, but this method is also called
+            // from onDestroy, which is already on it.
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                controller.detach()
+            } else {
+                mainHandler.post { controller.detach() }
+            }
+        }
+    }
 
+    private fun stopEverything(reason: AssistantStoppedReason) {
+        teardownSession()
         assistantState.setStatus(AssistantStatus.Stopped(reason))
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -300,17 +328,7 @@ class AssistantService : LifecycleService() {
     override fun onDestroy() {
         // Belt and braces: onDestroy can arrive without a stop action, for example when the
         // process is being reclaimed.
-        analysisJob?.cancel()
-        entitlementJob?.cancel()
-        capturer?.release()
-        capturer = null
-        projection?.let {
-            runCatching { it.unregisterCallback(projectionCallback) }
-            runCatching { it.stop() }
-        }
-        projection = null
-        overlay?.detach()
-        overlay = null
+        teardownSession()
         feedback.release()
         if (assistantState.isRunning) {
             assistantState.setStatus(AssistantStatus.Stopped(AssistantStoppedReason.STOPPED_BY_DRIVER))
